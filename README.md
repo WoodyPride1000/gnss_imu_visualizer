@@ -31,11 +31,27 @@
 - `docs/manual.pdf`: 取扱説明書（PDF）
 - `README.md`: このファイル
 
+
+
+
+
+
+
+
 ---
 
 ## インストール手順（詳細は INSTALL.md）
+必要パッケージのインストール
+
+
+
 
 ```bash
+
+sudo apt-get install i2c-tools
+sudo pip install mpu6050-raspberrypi
+
+
 git clone https://github.com/WoodyPride1970/gnss_imu_visualizer.git
 cd gnss_imu_visualizer
 python -m venv venv
