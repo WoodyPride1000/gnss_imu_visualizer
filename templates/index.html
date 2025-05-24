@@ -1,3 +1,5 @@
+
+</html>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -7,235 +9,148 @@
   <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
-    #map { height: 500px; }
+    #map { height: 400px; }
   </style>
 </head>
 <body>
   <div class="container mt-3">
     <div class="d-flex justify-content-between align-items-center mb-3">
       <h1 data-i18n="title">GNSS+IMU ビジュアライザー</h1>
-      <select class="form-select w-auto" onchange="changeLang(this.value)">
+      <select class="form-select w-auto" id="langSelect" onchange="changeLang(this.value)">
         <option value="ja">日本語</option>
         <option value="en">English</option>
       </select>
     </div>
 
-    <div class="row">
-      <div class="col-md-8 mb-3">
-        <div class="card">
-          <div class="card-header" data-i18n="map_title">地図</div>
-          <div class="card-body p-0">
-            <div id="map"></div>
-          </div>
-        </div>
-      </div>
-      <div class="col-md-4 mb-3">
-        <div class="card">
-          <div class="card-header" data-i18n="sensor_info">センサ情報</div>
-          <div class="card-body">
-            <div id="status">--</div>
-
-            <!-- 座標系切替 -->
-            <label for="coordMode" data-i18n="coord_mode_label"></label>
-            <select id="coordMode" class="form-select mt-2" onchange="updateCoordinatesDisplay()">
-              <option value="latlon" data-i18n="latitude_longitude">緯度経度</option>
-              <option value="mgrs" data-i18n="mgrs">MGRS</option>
-              <option value="utm" data-i18n="utm">UTM</option>
-            </select>
-
-            <div id="coordinateDisplay" class="mt-2"></div>
-
-            <button class="btn btn-primary mt-3" onclick="reconnectSensor()" data-i18n="reconnect">センサ再接続</button>
-          </div>
-        </div>
-      </div>
+    <div class="mb-3">
+      <label for="coordMode" data-i18n="coord_mode_label"></label>
+      <select id="coordMode" class="form-select w-auto" onchange="updateDisplay()">
+        <option value="latlon" data-i18n="latitude_longitude">緯度経度</option>
+        <option value="mgrs" data-i18n="mgrs">MGRS</option>
+        <option value="utm" data-i18n="utm">UTM</option>
+      </select>
     </div>
+
+    <div id="coordinateDisplay" class="mb-3" style="font-family: monospace;"></div>
+
+    <div id="map"></div>
   </div>
 
-  <!-- 外部ライブラリ -->
+  <!-- ライブラリ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <script src="https://unpkg.com/i18next@22/i18next.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/mgrs@0.0.6/mgrs.min.js"></script>
+  <script src="https://unpkg.com/i18next@22/i18next.min.js"></script>
 
   <script>
-    // --- 多言語リソース ---
+    // 多言語リソース
     const resources = {
       ja: {
         translation: {
           title: "GNSS+IMU ビジュアライザー",
-          reconnect: "センサ再接続",
-          sensor_info: "センサ情報",
-          map_title: "地図",
-          latitude: "緯度",
-          longitude: "経度",
-          heading: "方位",
-          velocity: "速度",
+          coord_mode_label: "座標系切替",
           latitude_longitude: "緯度経度",
           mgrs: "MGRS",
-          utm: "UTM",
-          coord_mode_label: "座標系切替",
-          status_connected: "接続中",
-          status_disconnected: "未接続"
+          utm: "UTM"
         }
       },
       en: {
         translation: {
           title: "GNSS+IMU Visualizer",
-          reconnect: "Reconnect Sensor",
-          sensor_info: "Sensor Info",
-          map_title: "Map",
-          latitude: "Latitude",
-          longitude: "Longitude",
-          heading: "Heading",
-          velocity: "Velocity",
+          coord_mode_label: "Coordinate System",
           latitude_longitude: "Latitude/Longitude",
           mgrs: "MGRS",
-          utm: "UTM",
-          coord_mode_label: "Coordinate System",
-          status_connected: "Connected",
-          status_disconnected: "Disconnected"
+          utm: "UTM"
         }
       }
     };
 
+    // i18next初期化
     i18next.init({
       lng: 'ja',
       debug: false,
       resources
-    }, function(err, t) {
+    }, () => {
       updateContent();
     });
 
+    // ページ内のテキスト更新
     function updateContent() {
       document.querySelectorAll('[data-i18n]').forEach(el => {
         const key = el.getAttribute('data-i18n');
         el.textContent = i18next.t(key);
       });
-      // select optionsの翻訳反映
-      const coordModeSelect = document.getElementById("coordMode");
+
+      // select optionsの翻訳
+      const coordModeSelect = document.getElementById('coordMode');
       for (let option of coordModeSelect.options) {
         const key = option.getAttribute('data-i18n');
-        if(key) option.textContent = i18next.t(key);
+        if (key) option.textContent = i18next.t(key);
       }
 
-      document.title = i18next.t("title");
-      updateCoordinatesDisplay();
+      document.title = i18next.t('title');
     }
 
     function changeLang(lang) {
       i18next.changeLanguage(lang, () => {
         updateContent();
-        updateStatus();
       });
     }
 
-    function reconnectSensor() {
-      alert(i18next.t('reconnect') + "...");
-      if(socket && socket.connected === false) {
-        socket.connect();
-      }
-    }
-
-    // --- Leaflet地図初期化 ---
-    const map = L.map('map').setView([35.681236, 139.767125], 15); // 東京駅
-
+    // 地図初期化
+    const map = L.map('map').setView([35.681236, 139.767125], 15);
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '© OpenStreetMap contributors'
+      attribution: '&copy; OpenStreetMap contributors'
     }).addTo(map);
 
-    // マーカー初期化
-    let marker = L.marker([35.681236, 139.767125]).addTo(map);
+    const marker = L.marker([35.681236, 139.767125]).addTo(map);
 
-    // --- 座標データ ---
     let latestPos = { lat: 35.681236, lon: 139.767125 };
 
-    // --- 状態表示 ---
-    function updateStatus(status) {
-      const el = document.getElementById("status");
-      if(!status) {
-        el.textContent = i18next.t("status_disconnected");
-        el.classList.remove("text-success");
-        el.classList.add("text-danger");
-      } else {
-        el.textContent = i18next.t("status_connected");
-        el.classList.remove("text-danger");
-        el.classList.add("text-success");
-      }
-    }
+    const coordModeSelect = document.getElementById('coordMode');
 
-    // --- 座標表示更新 ---
-    function updateCoordinatesDisplay() {
-      const mode = document.getElementById("coordMode").value;
+    // 座標表示更新
+    function updateDisplay() {
+      const mode = coordModeSelect.value;
       const lat = latestPos.lat;
       const lon = latestPos.lon;
-      let text = "";
+      let displayText = '';
 
-      if(typeof lat !== "number" || typeof lon !== "number") {
-        text = "無効な座標データ";
-        document.getElementById("coordinateDisplay").innerHTML = text;
-        return;
-      }
-
-      if (mode === "latlon") {
-        text = `${i18next.t("latitude")}: ${lat.toFixed(6)}<br>${i18next.t("longitude")}: ${lon.toFixed(6)}`;
-      } else if (mode === "mgrs") {
-        try {
+      try {
+        if (mode === 'latlon') {
+          displayText = `${i18next.t('latitude_longitude').split('/')[0]}: ${lat.toFixed(6)}<br>${i18next.t('latitude_longitude').split('/')[1]}: ${lon.toFixed(6)}`;
+        } else if (mode === 'mgrs') {
           const mgrsStr = mgrs.forward([lon, lat]);
-          text = `MGRS: ${mgrsStr}`;
-        } catch (e) {
-          text = "MGRS変換エラー";
-          console.error(e);
-        }
-      } else if (mode === "utm") {
-        try {
+          displayText = `MGRS: ${mgrsStr}`;
+        } else if (mode === 'utm') {
           const zone = Math.floor((lon + 180) / 6) + 1;
-          const isSouth = lat < 0;
-          const utmProj = `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs ${isSouth ? '+south' : ''}`;
-          const utmCoords = proj4('WGS84', utmProj, [lon, lat]);
-          text = `UTM Zone ${zone}${isSouth ? 'S' : 'N'} X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
-        } catch(e) {
-          text = "UTM変換エラー";
-          console.error(e);
+          const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
+          displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
         }
+      } catch (e) {
+        displayText = 'Error in coordinate conversion';
+        console.error(e);
       }
 
-      document.getElementById("coordinateDisplay").innerHTML = text;
+      document.getElementById('coordinateDisplay').innerHTML = displayText;
     }
 
-    // --- Socket.io接続 ---
+    // Socket.io接続
     const socket = io();
 
-    socket.on('connect', () => {
-      updateStatus(true);
-      console.log('Socket.io connected');
-      // もしサーバ側に再接続要求が必要ならここでemitも可
-    });
-
-    socket.on('disconnect', () => {
-      updateStatus(false);
-      console.log('Socket.io disconnected');
-    });
-
-    // サーバーから座標データを受け取る想定 {lat: number, lon: number}
     socket.on('position', (data) => {
-      if(data && typeof data.lat === 'number' && typeof data.lon === 'number') {
-        latestPos = { lat: data.lat, lon: data.lon };
-        // マーカー移動
+      if (data && typeof data.lat === 'number' && typeof data.lon === 'number') {
+        latestPos.lat = data.lat;
+        latestPos.lon = data.lon;
+
         marker.setLatLng([latestPos.lat, latestPos.lon]);
-        // 地図中心を移動（必要なら）
         map.panTo([latestPos.lat, latestPos.lon]);
-        updateCoordinatesDisplay();
-      } else {
-        console.warn("無効な座標データ受信", data);
+        updateDisplay();
       }
     });
 
-    // 初期座標表示更新
-    updateCoordinatesDisplay();
-    updateStatus(false);
-
+    updateDisplay();
   </script>
 </body>
 </html>
