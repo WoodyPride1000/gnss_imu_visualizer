@@ -23,7 +23,7 @@
 - `run.py`: Flaskサーバー本体
 - `sensor.py`: センサ取得＆シミュレーション管理
 - `kalman.py`: Kalman Filter ロジック
-- `imu.py`: MPU6050センサー用ドライバ
+- `imu_reader.py`: MPU6050センサー用ドライバ
 - `templates/index.html`: UIページ（地図とグラフ）
 - `public/map.js`: 地図処理（Leaflet）
 - `public/chart.js`: グラフ表示（Chart.js）
@@ -33,8 +33,17 @@
 - `README.md`: このファイル
 
 
-
-
+project/
+├── run.py
+├── sensor.py
+├── kalman.py
+├── imu_reader.py
+├── templates/
+│   └── index.html
+└── static/
+    └── public/
+        ├── map.js
+        └── chart.js
 
 
 
