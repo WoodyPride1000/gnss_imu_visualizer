@@ -52,24 +52,7 @@
           title: "GNSS+IMU ビジュアライザー",
           reconnect: "センサ再接続",
           sensor_info: "センサ情報",
-          map_title: "地図"
-        }
-      },
-      en: {
-        translation: {
-          title: "GNSS+IMU Visualizer",
-          reconnect: "Reconnect Sensor",
-          sensor_info: "Sensor Info",
-          map_title: "Map"
-        }
-      }
-    };
-
-    i18next.init({
-    const resources = {
-      ja: {
-        translation: {
-          // 既存文言...
+          map_title: "地図",
           latitude: "緯度",
           longitude: "経度",
           heading: "方位",
@@ -78,7 +61,10 @@
       },
       en: {
         translation: {
-          // 既存文言...
+          title: "GNSS+IMU Visualizer",
+          reconnect: "Reconnect Sensor",
+          sensor_info: "Sensor Info",
+          map_title: "Map",
           latitude: "Latitude",
           longitude: "Longitude",
           heading: "Heading",
@@ -86,6 +72,8 @@
         }
       }
     };
+
+    i18next.init({
       lng: 'ja',
       debug: false,
       resources
@@ -108,9 +96,6 @@
       alert(i18next.t('reconnect') + "...");
       // 実装例: socket.emit("reconnect_request");
     }
-
-    // 地図表示は map.js 側に実装されている想定
   </script>
 </body>
 </html>
-
