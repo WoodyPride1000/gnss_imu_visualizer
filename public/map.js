@@ -1,83 +1,69 @@
-// Initialize Leaflet map at Tokyo coordinates
-const map = L.map('map').setView([35.681236, 139.767125], 17);
-L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-    attribution: 'Map data © OpenStreetMap contributors'
-}).addTo(map);
+class MapController {
+  constructor(mapElementId) {
+    this.map = L.map(mapElementId).setView([35.681236, 139.767125], 15); // 初期位置: 東京駅
+    this.pathPoints = [];
+    this.marker = null;
+    this.polyline = L.polyline([], { color: 'blue' }).addTo(this.map);
 
-let marker = null;
-let accuracyCircle = null;
+    this._initTileLayer();
+  }
 
-// モード表示用ラベル
-const statusEl = document.getElementById('rtk-status');
-const headingEl = document.getElementById('heading-info');
-const errorEl = document.getElementById('error-radius');
-const timestampEl = document.getElementById('timestamp');
-const satelliteEl = document.getElementById('satellite-info');
-const toggleBtn = document.getElementById('toggle-sensor');
+  _initTileLayer() {
+    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+      maxZoom: 19,
+      attribution: '&copy; OpenStreetMap contributors'
+    }).addTo(this.map);
+  }
 
-// 切り替えボタン
-let currentMode = 'auto'; // 'auto', 'real', 'sim'
+  updatePosition(lat, lon, headingDeg) {
+    const newLatLng = [lat, lon];
+    this.pathPoints.push(newLatLng);
 
-toggleBtn.addEventListener('click', () => {
-    if (currentMode === 'auto') {
-        currentMode = 'real';
-    } else if (currentMode === 'real') {
-        currentMode = 'sim';
+    if (this.marker) {
+      this.marker.setLatLng(newLatLng);
+      this.marker.setRotationAngle(headingDeg); // 追加: ヘディング反映
     } else {
-        currentMode = 'auto';
+      this.marker = L.marker(newLatLng, {
+        icon: this._createHeadingIcon(),
+        rotationAngle: headingDeg,
+        rotationOrigin: 'center'
+      }).addTo(this.map);
     }
-    socket.emit('toggle_sensor_mode', { mode: currentMode });
-    toggleBtn.innerText = `Mode: ${currentMode.toUpperCase()}`;
-});
 
+    this.polyline.setLatLngs(this.pathPoints);
+    this.map.setView(newLatLng);
+  }
+
+  _createHeadingIcon() {
+    return L.divIcon({
+      html: '▲',
+      iconSize: [20, 20],
+      className: 'heading-icon',
+      iconAnchor: [10, 10],
+      tooltipAnchor: [0, -10]
+    });
+  }
+}
+
+// ツールチップの国際化
+function updateStatus(data) {
+  const status = `
+    <strong>${i18next.t("latitude")}:</strong> ${data.lat}<br>
+    <strong>${i18next.t("longitude")}:</strong> ${data.lon}<br>
+    <strong>${i18next.t("heading")}:</strong> ${data.heading.toFixed(1)}°<br>
+    <strong>${i18next.t("velocity")}:</strong> ${data.velocity.toFixed(2)} m/s
+  `;
+  document.getElementById("status").innerHTML = status;
+}
+
+// 初期化
+const mapController = new MapController("map");
 const socket = io();
 
-socket.on('connect', () => {
-    console.log('Connected to server');
-});
+socket.on("sensor_data", (data) => {
+  const { lat, lon, heading, velocity } = data;
+  if (!lat || !lon) return;
 
-socket.on('error', (data) => {
-    console.error('Server error:', data.message);
-    statusEl.innerText = `Error: ${data.message}`;
-});
-
-socket.on('mode_update', (data) => {
-    console.log('Sensor mode:', data.current_mode);
-});
-
-socket.on('message', (data) => {
-    const { lat, lon, heading, rtk_fix_type, error_radius, satellite_count, timestamp } = data;
-
-    // マーカー描画
-    if (!marker) {
-        marker = L.marker([lat, lon], {
-            rotationAngle: heading,
-            rotationOrigin: 'center center'
-        }).addTo(map);
-    } else {
-        marker.setLatLng([lat, lon]);
-        marker.setRotationAngle(heading);
-    }
-
-    // 誤差円描画
-    if (!accuracyCircle) {
-        accuracyCircle = L.circle([lat, lon], {
-            radius: error_radius,
-            color: rtk_fix_type === 4 ? 'green' : 'red',
-            fillOpacity: 0.2
-        }).addTo(map);
-    } else {
-        accuracyCircle.setLatLng([lat, lon]);
-        accuracyCircle.setRadius(error_radius);
-        accuracyCircle.setStyle({
-            color: rtk_fix_type === 4 ? 'green' : 'red'
-        });
-    }
-
-    // ステータス表示
-    statusEl.innerText = `RTK Mode: ${rtk_fix_type === 4 ? 'FIXED' : 'FLOAT/NONE'}`;
-    headingEl.innerText = `Heading: ${heading.toFixed(1)}°`;
-    errorEl.innerText = `Error Radius: ${error_radius.toFixed(2)} m`;
-    timestampEl.innerText = `Timestamp: ${timestamp}`;
-    satelliteEl.innerText = `Satellites: ${satellite_count || 'N/A'}`;
+  mapController.updatePosition(lat, lon, heading);
+  updateStatus(data);
 });
