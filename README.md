@@ -20,7 +20,7 @@
 
 ## 構成
 
-- `run.py`: Flaskサーバー本体
+ `run.py`: Flaskサーバー本体
 - `sensor.py`: センサ取得＆シミュレーション管理
 - `kalman.py`: Kalman Filter ロジック
 - `imu_reader.py`: MPU6050センサー用ドライバ
@@ -32,18 +32,22 @@
 - `docs/manual.pdf`: 取扱説明書（PDF）
 - `README.md`: このファイル
 
+---
 
-project/
-├── run.py
-├── sensor.py
-├── kalman.py
-├── imu_reader.py
-├── templates/
-│   └── index.html
-└── static/
-    └── public/
-        ├── map.js
-        └── chart.js
+## ディレクトリ構造
+
+
+-　project/
+-　├── run.py
+-　├── sensor.py
+-　├── kalman.py
+-　├── imu_reader.py
+-　├── templates/
+-　│   └── index.html
+-　└── static/
+-　    └── public/
+-　        ├── map.js
+-　        └── chart.js
 
 
 
