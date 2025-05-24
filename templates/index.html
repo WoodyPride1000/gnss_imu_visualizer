@@ -1,5 +1,4 @@
 
-</html>
 <!DOCTYPE html>
 <html lang="ja">
 <head>
@@ -10,6 +9,16 @@
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
   <style>
     #map { height: 400px; }
+    /* 座標系のセレクトボックスと測地系のセレクトボックスを横並びにする */
+    .form-group-row {
+      display: flex;
+      gap: 15px; /* 隙間を調整 */
+      align-items: center;
+      margin-bottom: 1rem; /* 下のマージン */
+    }
+    .form-group-row > div {
+      flex-grow: 1; /* 必要に応じて要素を拡大 */
+    }
   </style>
 </head>
 <body>
@@ -22,13 +31,18 @@
       </select>
     </div>
 
-    <div class="mb-3">
-      <label for="coordMode" data-i18n="coord_mode_label"></label>
-      <select id="coordMode" class="form-select w-auto" onchange="updateDisplay()">
-        <option value="latlon" data-i18n="latitude_longitude">緯度経度</option>
-        <option value="mgrs" data-i18n="mgrs">MGRS</option>
-        <option value="utm" data-i18n="utm">UTM</option>
-      </select>
+    <div class="form-group-row">
+      <div>
+        <label for="coordMode" data-i18n="coord_mode_label"></label>
+        <select id="coordMode" class="form-select w-auto" onchange="updateDisplay(); togglePlaneCoordSystemSelect();">
+        </select>
+      </div>
+
+      <div id="planeCoordSystemSelectDiv" style="display: none;">
+        <label for="planeCoordSystem" data-i18n="plane_coord_system_label"></label>
+        <select id="planeCoordSystem" class="form-select w-auto" onchange="updateDisplay()">
+          </select>
+      </div>
     </div>
 
     <div id="coordinateDisplay" class="mb-3" style="font-family: monospace;"></div>
@@ -36,7 +50,6 @@
     <div id="map"></div>
   </div>
 
-  <!-- ライブラリ -->
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
   <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
   <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
@@ -52,7 +65,14 @@
           coord_mode_label: "座標系切替",
           latitude_longitude: "緯度経度",
           mgrs: "MGRS",
-          utm: "UTM"
+          utm: "UTM",
+          plane_rectangular: "平面直角座標系",
+          plane_coord_system_label: "測地系選択",
+          x_coord: "X座標",
+          y_coord: "Y座標",
+          east_direction: "東方向",
+          north_direction: "北方向",
+          error_coord_conversion: "座標変換エラー"
         }
       },
       en: {
@@ -61,10 +81,49 @@
           coord_mode_label: "Coordinate System",
           latitude_longitude: "Latitude/Longitude",
           mgrs: "MGRS",
-          utm: "UTM"
+          utm: "UTM",
+          plane_rectangular: "Plane Rectangular Coordinates",
+          plane_coord_system_label: "Plane System",
+          x_coord: "X-Coord",
+          y_coord: "Y-Coord",
+          east_direction: "East",
+          north_direction: "North",
+          error_coord_conversion: "Coordinate Conversion Error"
         }
       }
     };
+
+    // 日本の平面直角座標系定義 (JGD2011に基づく)
+    // 参照: 国土地理院 https://www.gsi.go.jp/sokuchikijun/jgd2011-coordinate.html
+    const planeCoordSystems = [
+      { id: 'I', name: '測地系I (北海道)', proj4def: '+proj=tmerc +lat_0=45 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'II', name: '測地系II (東北)', proj4def: '+proj=tmerc +lat_0=43 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'III', name: '測地系III (東北・関東)', proj4def: '+proj=tmerc +lat_0=41 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'IV', name: '測地系IV (関東・中部)', proj4def: '+proj=tmerc +lat_0=39 +lon_0=138 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'V', name: '測地系V (中部・近畿)', proj4def: '+proj=tmerc +lat_0=37 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'VI', name: '測地系VI (近畿・中国)', proj4def: '+proj=tmerc +lat_0=35 +lon_0=134 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'VII', name: '測地系VII (中国・四国)', proj4def: '+proj=tmerc +lat_0=33 +lon_0=132 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'VIII', name: '測地系VIII (九州)', proj4def: '+proj=tmerc +lat_0=31 +lon_0=130 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'IX', name: '測地系IX (沖縄)', proj4def: '+proj=tmerc +lat_0=29 +lon_0=129 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'X', name: '測地系X (沖縄周辺)', proj4def: '+proj=tmerc +lat_0=27 +lon_0=128 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XI', name: '測地系XI (小笠原)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XII', name: '測地系XII (南鳥島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=154 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XIII', name: '測地系XIII (沖ノ鳥島)', proj4def: '+proj=tmerc +lat_0=21 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XIV', name: '測地系XIV (南硫黄島)', proj4def: '+proj=tmerc +lat_0=20 +lon_0=145 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XV', name: '測地系XV (火山列島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=141 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XVI', name: '測地系XVI (大東諸島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=131 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XVII', name: '測地系XVII (琉球諸島南部)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=124 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XVIII', name: '測地系XVIII (尖閣諸島)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=123 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+      { id: 'XIX', name: '測地系XIX (与那国島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=122 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' }
+    ];
+
+    // coordMode のオプション定義（i18nextのキーと値）
+    const coordModeOptions = [
+      { value: 'latlon', i18nKey: 'latitude_longitude' },
+      { value: 'mgrs', i18nKey: 'mgrs' },
+      { value: 'utm', i18nKey: 'utm' },
+      { value: 'plane', i18nKey: 'plane_rectangular' }
+    ];
 
     // i18next初期化
     i18next.init({
@@ -72,7 +131,10 @@
       debug: false,
       resources
     }, () => {
+      populateCoordModeSelect(); // coordMode セレクトボックスの生成
+      populatePlaneCoordSystemSelect(); // 測地系セレクトボックスの初期化
       updateContent();
+      updateDisplay(); // 初期表示
     });
 
     // ページ内のテキスト更新
@@ -82,14 +144,18 @@
         el.textContent = i18next.t(key);
       });
 
-      // select optionsの翻訳
-      const coordModeSelect = document.getElementById('coordMode');
-      for (let option of coordModeSelect.options) {
-        const key = option.getAttribute('data-i18n');
-        if (key) option.textContent = i18next.t(key);
-      }
+      // coordMode Select Optionsの翻訳 (JavaScriptで再生成するため不要になる)
+      // const coordModeSelect = document.getElementById('coordMode');
+      // for (let option of coordModeSelect.options) {
+      //   const key = option.getAttribute('data-i18n');
+      //   if (key) option.textContent = i18next.t(key);
+      // }
 
       document.title = i18next.t('title');
+
+      // 言語変更時に coordMode と planeCoordSystem のオプションを再生成して翻訳を適用
+      populateCoordModeSelect(document.getElementById('coordMode').value); // 現在の選択を保持
+      populatePlaneCoordSystemSelect(document.getElementById('planeCoordSystem').value); // 現在の選択を保持
     }
 
     function changeLang(lang) {
@@ -108,7 +174,66 @@
 
     let latestPos = { lat: 35.681236, lon: 139.767125 };
 
+    function updateLatestPosition(lat, lon) {
+      latestPos.lat = lat;
+      latestPos.lon = lon;
+      updateDisplay();
+      marker.setLatLng([lat, lon]);
+      map.panTo([lat, lon]);
+    }
+
+
+
+
     const coordModeSelect = document.getElementById('coordMode');
+    const planeCoordSystemSelectDiv = document.getElementById('planeCoordSystemSelectDiv');
+    const planeCoordSystemSelect = document.getElementById('planeCoordSystem');
+
+    // coordMode のセレクトボックスを生成（多言語対応）
+    function populateCoordModeSelect(selectedValue = null) {
+      coordModeSelect.innerHTML = ''; // 既存のオプションをクリア
+      coordModeOptions.forEach(optionDef => {
+        const option = document.createElement('option');
+        option.value = optionDef.value;
+        option.textContent = i18next.t(optionDef.i18nKey); // i18nextで翻訳
+        coordModeSelect.appendChild(option);
+      });
+      // 以前選択されていた値を保持
+      if (selectedValue) {
+        coordModeSelect.value = selectedValue;
+      } else {
+        coordModeSelect.value = 'latlon'; // デフォルト値
+      }
+      togglePlaneCoordSystemSelect(); // オプション生成後に表示調整
+    }
+
+    // 平面直角座標系のセレクトボックスを生成
+    function populatePlaneCoordSystemSelect(selectedValue = null) {
+      planeCoordSystemSelect.innerHTML = ''; // 既存のオプションをクリア
+      planeCoordSystems.forEach(system => {
+        const option = document.createElement('option');
+        option.value = system.id;
+        // nameプロパティはリソースで定義されているため直接使用
+        option.textContent = system.name;
+        planeCoordSystemSelect.appendChild(option);
+      });
+
+      // 以前選択されていた値を保持
+      if (selectedValue) {
+        planeCoordSystemSelect.value = selectedValue;
+      } else {
+        planeCoordSystemSelect.value = 'VI'; // デフォルト値
+      }
+    }
+
+    // 平面直角座標系選択時に、測地系選択ドロップダウンの表示/非表示を切り替える
+    function togglePlaneCoordSystemSelect() {
+      if (coordModeSelect.value === 'plane') {
+        planeCoordSystemSelectDiv.style.display = 'block';
+      } else {
+        planeCoordSystemSelectDiv.style.display = 'none';
+      }
+    }
 
     // 座標表示更新
     function updateDisplay() {
@@ -127,9 +252,24 @@
           const zone = Math.floor((lon + 180) / 6) + 1;
           const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
           displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
+        } else if (mode === 'plane') {
+          const selectedSystemId = planeCoordSystemSelect.value;
+          const selectedSystem = planeCoordSystems.find(s => s.id === selectedSystemId);
+
+          if (selectedSystem) {
+            // WGS84 (EPSG:4326) から選択された平面直角座標系に変換
+            const planeCoords = proj4('WGS84', selectedSystem.proj4def, [lon, lat]);
+            
+            // 日本の平面直角座標系は、X(南北)とY(東西)が一般的。
+            // proj4jsの出力は [lon_converted, lat_converted] または [Easting, Northing] の順になるため
+            // planeCoords[0] が東方向 (Y座標)、planeCoords[1] が北方向 (X座標) となる。
+            displayText = `${i18next.t('y_coord')} (${i18next.t('east_direction')}): ${planeCoords[0].toFixed(2)} m<br>${i18next.t('x_coord')} (${i18next.t('north_direction')}): ${planeCoords[1].toFixed(2)} m`;
+          } else {
+            displayText = i18next.t('error_coord_conversion') + ': ' + i18next.t('plane_coord_system_label') + 'が見つかりません';
+          }
         }
       } catch (e) {
-        displayText = 'Error in coordinate conversion';
+        displayText = i18next.t('error_coord_conversion');
         console.error(e);
       }
 
@@ -150,7 +290,8 @@
       }
     });
 
-    updateDisplay();
+    // ページの初期ロード時に、測地系選択ボックスの表示/非表示を調整
+    togglePlaneCoordSystemSelect();
   </script>
 </body>
 </html>
