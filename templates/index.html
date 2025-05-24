@@ -25,7 +25,9 @@
           <p id="rtk-status" class="status-box">---</p>
           <p id="satellite-info" class="status-box">---</p>
           <p id="heading-info" class="status-box">---</p>
-          <button class="btn btn-outline-primary btn-sm" onclick="toggleSensor()">センサ切替</button>
+          <p id="error-radius" class="status-box">---</p>
+          <p id="timestamp" class="status-box">---</p>
+          <button id="toggle-sensor" class="btn btn-outline-primary btn-sm" onclick="toggleSensor()">センサ切替</button>
         </div>
       </div>
       <div class="col-md-6">
@@ -37,7 +39,7 @@
   <script src="https://cdn.socket.io/4.5.4/socket.io.min.js"></script>
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="/public/map.js"></script>
-  <script src="/public/chart.js"></script>
+  <script src="/static/public/map.js"></script>
+  <script src="/static/public/chart.js"></script>
 </body>
 </html>
