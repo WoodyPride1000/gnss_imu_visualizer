@@ -1,5 +1,3 @@
-# kalman.py
-
 """
 Simple 1D Kalman Filter implementation for position and heading estimation.
 """
@@ -19,6 +17,9 @@ def kalman_filter(z_meas, x_est_prev, p_est_prev, A=1.0, H=1.0, Q=0.01, R=1.0):
         x_est : float - Updated state estimate
         p_est : float - Updated error covariance
     """
+    if not isinstance(z_meas, (int, float)) or z_meas is None:
+        raise ValueError("Measurement must be a valid number")
+
     # Predict
     x_pred = A * x_est_prev
     p_pred = A * p_est_prev * A + Q
