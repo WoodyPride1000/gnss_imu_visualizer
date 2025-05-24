@@ -86,6 +86,9 @@
         const key = el.getAttribute('data-i18n');
         el.textContent = i18next.t(key);
       });
+
+      // <title> タグの更新
+      document.title = i18next.t('title');
     }
 
     function changeLang(lang) {
@@ -94,8 +97,10 @@
 
     function reconnectSensor() {
       alert(i18next.t('reconnect') + "...");
-      // 実装例: socket.emit("reconnect_request");
+      // 例: socket.emit("reconnect_request");
     }
+
+    // 地図表示は map.js 側に任せる前提
   </script>
 </body>
 </html>
