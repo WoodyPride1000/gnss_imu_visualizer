@@ -20,7 +20,7 @@
 
 ## 構成
 
- `run.py`: Flaskサーバー本体
+- `run.py`: Flaskサーバー本体
 - `sensor.py`: センサ取得＆シミュレーション管理
 - `kalman.py`: Kalman Filter ロジック
 - `imu_reader.py`: MPU6050センサー用ドライバ
