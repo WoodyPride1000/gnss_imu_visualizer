@@ -34,26 +34,6 @@
 
 ---
 
-## ディレクトリ構造
-
-
--　project/
--　├── run.py
--　├── sensor.py
--　├── kalman.py
--　├── imu_reader.py
--　├── templates/
--　│   └── index.html
--　└── static/
--　    └── public/
--　        ├── map.js
--　        └── chart.js
-
-
-
-
----
-
 ## インストール手順（詳細は INSTALL.md）
 必要パッケージのインストール
 
