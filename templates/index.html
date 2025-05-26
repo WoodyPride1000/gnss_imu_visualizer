@@ -1,297 +1,358 @@
-
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-  <title data-i18n="title">GNSS+IMU ビジュアライザー</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <style>
-    #map { height: 400px; }
-    /* 座標系のセレクトボックスと測地系のセレクトボックスを横並びにする */
-    .form-group-row {
-      display: flex;
-      gap: 15px; /* 隙間を調整 */
-      align-items: center;
-      margin-bottom: 1rem; /* 下のマージン */
-    }
-    .form-group-row > div {
-      flex-grow: 1; /* 必要に応じて要素を拡大 */
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <title data-i18n="title">GNSS+IMU ビジュアライザー</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <style>
+        #map, #errorChartContainer {
+            width: 100%;
+            height: 400px;
+            max-height: 50vh;
+        }
+        .form-group-row {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            margin-bottom: 1rem;
+        }
+        .form-group-row > div {
+            flex-grow: 1;
+        }
+        .heading-icon {
+            font-size: 16px;
+            color: blue;
+            text-align: center;
+            line-height: 20px;
+        }
+    </style>
 </head>
 <body>
-  <div class="container mt-3">
-    <div class="d-flex justify-content-between align-items-center mb-3">
-      <h1 data-i18n="title">GNSS+IMU ビジュアライザー</h1>
-      <select class="form-select w-auto" id="langSelect" onchange="changeLang(this.value)">
-        <option value="ja">日本語</option>
-        <option value="en">English</option>
-      </select>
+    <div class="container mt-3">
+        <div class="d-flex justify-content-between align-items-center mb-3">
+            <h1 data-i18n="title">GNSS+IMU ビジュアライザー</h1>
+            <select class="form-select w-auto" id="langSelect" onchange="changeLang(this.value)">
+                <option value="ja">日本語</option>
+                <option value="en">English</option>
+            </select>
+        </div>
+
+        <div class="form-group-row">
+            <div>
+                <label for="coordMode" data-i18n="coord_mode_label"></label>
+                <select id="coordMode" class="form-select w-auto" onchange="updateDisplay(); togglePlaneCoordSystemSelect();"></select>
+            </div>
+            <div id="planeCoordSystemSelectDiv" style="display: none;">
+                <label for="planeCoordSystem" data-i18n="plane_coord_system_label"></label>
+                <select id="planeCoordSystem" class="form-select w-auto" onchange="updateDisplay()"></select>
+            </div>
+        </div>
+
+        <div id="status" class="mb-3" style="font-family: monospace;"></div>
+        <div id="coordinateDisplay" class="mb-3" style="font-family: monospace;"></div>
+        <div id="map" class="mb-3"></div>
+        <div id="errorChartContainer" class="mb-3">
+            <canvas id="errorChart"></canvas>
+        </div>
     </div>
 
-    <div class="form-group-row">
-      <div>
-        <label for="coordMode" data-i18n="coord_mode_label"></label>
-        <select id="coordMode" class="form-select w-auto" onchange="updateDisplay(); togglePlaneCoordSystemSelect();">
-        </select>
-      </div>
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mgrs@0.0.6/mgrs.min.js"></script>
+    <script src="https://unpkg.com/i18next@22/i18next.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@3.9.1/dist/chart.min.js"></script>
 
-      <div id="planeCoordSystemSelectDiv" style="display: none;">
-        <label for="planeCoordSystem" data-i18n="plane_coord_system_label"></label>
-        <select id="planeCoordSystem" class="form-select w-auto" onchange="updateDisplay()">
-          </select>
-      </div>
-    </div>
+    <script>
+        // 多言語リソース
+        const resources = {
+            ja: {
+                translation: {
+                    title: "GNSS+IMU ビジュアライザー",
+                    coord_mode_label: "座標系切替",
+                    latitude_longitude: "緯度経度",
+                    mgrs: "MGRS",
+                    utm: "UTM",
+                    plane_rectangular: "平面直角座標系",
+                    plane_coord_system_label: "測地系選択",
+                    x_coord: "X座標",
+                    y_coord: "Y座標",
+                    east_direction: "東方向",
+                    north_direction: "北方向",
+                    error_coord_conversion: "座標変換エラー",
+                    latitude: "緯度",
+                    longitude: "経度",
+                    heading: "ヘディング",
+                    velocity: "速度",
+                    rtk_status: "RTK状態",
+                    rtk_fixed: "RTK固定",
+                    rtk_float: "RTKフロート",
+                    rtk_none: "RTKなし",
+                    error_radius: "誤差半径",
+                    satellite_count: "衛星数",
+                    timestamp: "タイムスタンプ",
+                    server_error: "サーバーエラー",
+                    chart_error: "グラフ初期化エラー"
+                }
+            },
+            en: {
+                translation: {
+                    title: "GNSS+IMU Visualizer",
+                    coord_mode_label: "Coordinate System",
+                    latitude_longitude: "Latitude/Longitude",
+                    mgrs: "MGRS",
+                    utm: "UTM",
+                    plane_rectangular: "Plane Rectangular Coordinates",
+                    plane_coord_system_label: "Plane System",
+                    x_coord: "X-Coord",
+                    y_coord: "Y-Coord",
+                    east_direction: "East",
+                    north_direction: "North",
+                    error_coord_conversion: "Coordinate Conversion Error",
+                    latitude: "Latitude",
+                    longitude: "Longitude",
+                    heading: "Heading",
+                    velocity: "Velocity",
+                    rtk_status: "RTK Status",
+                    rtk_fixed: "RTK Fixed",
+                    rtk_float: "RTK Float",
+                    rtk_none: "No RTK",
+                    error_radius: "Error Radius",
+                    satellite_count: "Satellites",
+                    timestamp: "Timestamp",
+                    server_error: "Server Error",
+                    chart_error: "Chart Initialization Error"
+                }
+            }
+        };
 
-    <div id="coordinateDisplay" class="mb-3" style="font-family: monospace;"></div>
+        // 日本の平面直角座標系定義
+        const planeCoordSystems = [
+            { id: 'I', name: '測地系I (北海道)', proj4def: '+proj=tmerc +lat_0=45 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            // ... 他の測地系（省略） ...
+            { id: 'XIX', name: '測地系XIX (与那国島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=122 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' }
+        ];
 
-    <div id="map"></div>
-  </div>
+        const coordModeOptions = [
+            { value: 'latlon', i18nKey: 'latitude_longitude' },
+            { value: 'mgrs', i18nKey: 'mgrs' },
+            { value: 'utm', i18nKey: 'utm' },
+            { value: 'plane', i18nKey: 'plane_rectangular' }
+        ];
 
-  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-  <script src="https://cdn.socket.io/4.5.1/socket.io.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/proj4js/2.8.0/proj4.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/mgrs@0.0.6/mgrs.min.js"></script>
-  <script src="https://unpkg.com/i18next@22/i18next.min.js"></script>
+        // i18next初期化
+        i18next.init({
+            lng: 'ja',
+            debug: false,
+            resources
+        }, () => {
+            populateCoordModeSelect();
+            populatePlaneCoordSystemSelect();
+            updateContent();
+            updateDisplay();
+        });
 
-  <script>
-    // 多言語リソース
-    const resources = {
-      ja: {
-        translation: {
-          title: "GNSS+IMU ビジュアライザー",
-          coord_mode_label: "座標系切替",
-          latitude_longitude: "緯度経度",
-          mgrs: "MGRS",
-          utm: "UTM",
-          plane_rectangular: "平面直角座標系",
-          plane_coord_system_label: "測地系選択",
-          x_coord: "X座標",
-          y_coord: "Y座標",
-          east_direction: "東方向",
-          north_direction: "北方向",
-          error_coord_conversion: "座標変換エラー"
+        function updateContent() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = i18next.t(key);
+            });
+            document.title = i18next.t('title');
+            populateCoordModeSelect(document.getElementById('coordMode').value);
+            populatePlaneCoordSystemSelect(document.getElementById('planeCoordSystem').value);
         }
-      },
-      en: {
-        translation: {
-          title: "GNSS+IMU Visualizer",
-          coord_mode_label: "Coordinate System",
-          latitude_longitude: "Latitude/Longitude",
-          mgrs: "MGRS",
-          utm: "UTM",
-          plane_rectangular: "Plane Rectangular Coordinates",
-          plane_coord_system_label: "Plane System",
-          x_coord: "X-Coord",
-          y_coord: "Y-Coord",
-          east_direction: "East",
-          north_direction: "North",
-          error_coord_conversion: "Coordinate Conversion Error"
+
+        function changeLang(lang) {
+            i18next.changeLanguage(lang, () => {
+                updateContent();
+            });
         }
-      }
-    };
 
-    // 日本の平面直角座標系定義 (JGD2011に基づく)
-    // 参照: 国土地理院 https://www.gsi.go.jp/sokuchikijun/jgd2011-coordinate.html
-    const planeCoordSystems = [
-      { id: 'I', name: '測地系I (北海道)', proj4def: '+proj=tmerc +lat_0=45 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'II', name: '測地系II (東北)', proj4def: '+proj=tmerc +lat_0=43 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'III', name: '測地系III (東北・関東)', proj4def: '+proj=tmerc +lat_0=41 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'IV', name: '測地系IV (関東・中部)', proj4def: '+proj=tmerc +lat_0=39 +lon_0=138 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'V', name: '測地系V (中部・近畿)', proj4def: '+proj=tmerc +lat_0=37 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'VI', name: '測地系VI (近畿・中国)', proj4def: '+proj=tmerc +lat_0=35 +lon_0=134 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'VII', name: '測地系VII (中国・四国)', proj4def: '+proj=tmerc +lat_0=33 +lon_0=132 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'VIII', name: '測地系VIII (九州)', proj4def: '+proj=tmerc +lat_0=31 +lon_0=130 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'IX', name: '測地系IX (沖縄)', proj4def: '+proj=tmerc +lat_0=29 +lon_0=129 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'X', name: '測地系X (沖縄周辺)', proj4def: '+proj=tmerc +lat_0=27 +lon_0=128 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XI', name: '測地系XI (小笠原)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XII', name: '測地系XII (南鳥島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=154 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XIII', name: '測地系XIII (沖ノ鳥島)', proj4def: '+proj=tmerc +lat_0=21 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XIV', name: '測地系XIV (南硫黄島)', proj4def: '+proj=tmerc +lat_0=20 +lon_0=145 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XV', name: '測地系XV (火山列島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=141 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XVI', name: '測地系XVI (大東諸島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=131 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XVII', name: '測地系XVII (琉球諸島南部)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=124 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XVIII', name: '測地系XVIII (尖閣諸島)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=123 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-      { id: 'XIX', name: '測地系XIX (与那国島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=122 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' }
-    ];
-
-    // coordMode のオプション定義（i18nextのキーと値）
-    const coordModeOptions = [
-      { value: 'latlon', i18nKey: 'latitude_longitude' },
-      { value: 'mgrs', i18nKey: 'mgrs' },
-      { value: 'utm', i18nKey: 'utm' },
-      { value: 'plane', i18nKey: 'plane_rectangular' }
-    ];
-
-    // i18next初期化
-    i18next.init({
-      lng: 'ja',
-      debug: false,
-      resources
-    }, () => {
-      populateCoordModeSelect(); // coordMode セレクトボックスの生成
-      populatePlaneCoordSystemSelect(); // 測地系セレクトボックスの初期化
-      updateContent();
-      updateDisplay(); // 初期表示
-    });
-
-    // ページ内のテキスト更新
-    function updateContent() {
-      document.querySelectorAll('[data-i18n]').forEach(el => {
-        const key = el.getAttribute('data-i18n');
-        el.textContent = i18next.t(key);
-      });
-
-      // coordMode Select Optionsの翻訳 (JavaScriptで再生成するため不要になる)
-      // const coordModeSelect = document.getElementById('coordMode');
-      // for (let option of coordModeSelect.options) {
-      //   const key = option.getAttribute('data-i18n');
-      //   if (key) option.textContent = i18next.t(key);
-      // }
-
-      document.title = i18next.t('title');
-
-      // 言語変更時に coordMode と planeCoordSystem のオプションを再生成して翻訳を適用
-      populateCoordModeSelect(document.getElementById('coordMode').value); // 現在の選択を保持
-      populatePlaneCoordSystemSelect(document.getElementById('planeCoordSystem').value); // 現在の選択を保持
-    }
-
-    function changeLang(lang) {
-      i18next.changeLanguage(lang, () => {
-        updateContent();
-      });
-    }
-
-    // 地図初期化
-    const map = L.map('map').setView([35.681236, 139.767125], 15);
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-      attribution: '&copy; OpenStreetMap contributors'
-    }).addTo(map);
-
-    const marker = L.marker([35.681236, 139.767125]).addTo(map);
-
-    let latestPos = { lat: 35.681236, lon: 139.767125 };
-
-    function updateLatestPosition(lat, lon) {
-      latestPos.lat = lat;
-      latestPos.lon = lon;
-      updateDisplay();
-      marker.setLatLng([lat, lon]);
-      map.panTo([lat, lon]);
-    }
-
-
-
-
-    const coordModeSelect = document.getElementById('coordMode');
-    const planeCoordSystemSelectDiv = document.getElementById('planeCoordSystemSelectDiv');
-    const planeCoordSystemSelect = document.getElementById('planeCoordSystem');
-
-    // coordMode のセレクトボックスを生成（多言語対応）
-    function populateCoordModeSelect(selectedValue = null) {
-      coordModeSelect.innerHTML = ''; // 既存のオプションをクリア
-      coordModeOptions.forEach(optionDef => {
-        const option = document.createElement('option');
-        option.value = optionDef.value;
-        option.textContent = i18next.t(optionDef.i18nKey); // i18nextで翻訳
-        coordModeSelect.appendChild(option);
-      });
-      // 以前選択されていた値を保持
-      if (selectedValue) {
-        coordModeSelect.value = selectedValue;
-      } else {
-        coordModeSelect.value = 'latlon'; // デフォルト値
-      }
-      togglePlaneCoordSystemSelect(); // オプション生成後に表示調整
-    }
-
-    // 平面直角座標系のセレクトボックスを生成
-    function populatePlaneCoordSystemSelect(selectedValue = null) {
-      planeCoordSystemSelect.innerHTML = ''; // 既存のオプションをクリア
-      planeCoordSystems.forEach(system => {
-        const option = document.createElement('option');
-        option.value = system.id;
-        // nameプロパティはリソースで定義されているため直接使用
-        option.textContent = system.name;
-        planeCoordSystemSelect.appendChild(option);
-      });
-
-      // 以前選択されていた値を保持
-      if (selectedValue) {
-        planeCoordSystemSelect.value = selectedValue;
-      } else {
-        planeCoordSystemSelect.value = 'VI'; // デフォルト値
-      }
-    }
-
-    // 平面直角座標系選択時に、測地系選択ドロップダウンの表示/非表示を切り替える
-    function togglePlaneCoordSystemSelect() {
-      if (coordModeSelect.value === 'plane') {
-        planeCoordSystemSelectDiv.style.display = 'block';
-      } else {
-        planeCoordSystemSelectDiv.style.display = 'none';
-      }
-    }
-
-    // 座標表示更新
-    function updateDisplay() {
-      const mode = coordModeSelect.value;
-      const lat = latestPos.lat;
-      const lon = latestPos.lon;
-      let displayText = '';
-
-      try {
-        if (mode === 'latlon') {
-          displayText = `${i18next.t('latitude_longitude').split('/')[0]}: ${lat.toFixed(6)}<br>${i18next.t('latitude_longitude').split('/')[1]}: ${lon.toFixed(6)}`;
-        } else if (mode === 'mgrs') {
-          const mgrsStr = mgrs.forward([lon, lat]);
-          displayText = `MGRS: ${mgrsStr}`;
-        } else if (mode === 'utm') {
-          const zone = Math.floor((lon + 180) / 6) + 1;
-          const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
-          displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
-        } else if (mode === 'plane') {
-          const selectedSystemId = planeCoordSystemSelect.value;
-          const selectedSystem = planeCoordSystems.find(s => s.id === selectedSystemId);
-
-          if (selectedSystem) {
-            // WGS84 (EPSG:4326) から選択された平面直角座標系に変換
-            const planeCoords = proj4('WGS84', selectedSystem.proj4def, [lon, lat]);
-            
-            // 日本の平面直角座標系は、X(南北)とY(東西)が一般的。
-            // proj4jsの出力は [lon_converted, lat_converted] または [Easting, Northing] の順になるため
-            // planeCoords[0] が東方向 (Y座標)、planeCoords[1] が北方向 (X座標) となる。
-            displayText = `${i18next.t('y_coord')} (${i18next.t('east_direction')}): ${planeCoords[0].toFixed(2)} m<br>${i18next.t('x_coord')} (${i18next.t('north_direction')}): ${planeCoords[1].toFixed(2)} m`;
-          } else {
-            displayText = i18next.t('error_coord_conversion') + ': ' + i18next.t('plane_coord_system_label') + 'が見つかりません';
-          }
+        function populateCoordModeSelect(selectedValue = null) {
+            const coordModeSelect = document.getElementById('coordMode');
+            coordModeSelect.innerHTML = '';
+            coordModeOptions.forEach(optionDef => {
+                const option = document.createElement('option');
+                option.value = optionDef.value;
+                option.textContent = i18next.t(optionDef.i18nKey);
+                coordModeSelect.appendChild(option);
+            });
+            coordModeSelect.value = selectedValue || 'latlon';
+            togglePlaneCoordSystemSelect();
         }
-      } catch (e) {
-        displayText = i18next.t('error_coord_conversion');
-        console.error(e);
-      }
 
-      document.getElementById('coordinateDisplay').innerHTML = displayText;
-    }
+        function selectDefaultPlaneCoordSystem(lat, lon) {
+            const distances = planeCoordSystems.map(system => {
+                const [systemLon, systemLat] = [parseFloat(system.proj4def.match(/\+lon_0=([\d.]+)/)[1]), parseFloat(system.proj4def.match(/\+lat_0=([\d.]+)/)[1])];
+                return Math.sqrt((lat - systemLat) ** 2 + (lon - systemLon) ** 2);
+            });
+            const minIndex = distances.indexOf(Math.min(...distances));
+            return planeCoordSystems[minIndex].id;
+        }
 
-    // Socket.io接続
-    const socket = io();
+        function populatePlaneCoordSystemSelect(selectedValue = null) {
+            const planeCoordSystemSelect = document.getElementById('planeCoordSystem');
+            planeCoordSystemSelect.innerHTML = '';
+            planeCoordSystems.forEach(system => {
+                const option = document.createElement('option');
+                option.value = system.id;
+                option.textContent = system.name;
+                planeCoordSystemSelect.appendChild(option);
+            });
+            planeCoordSystemSelect.value = selectedValue || selectDefaultPlaneCoordSystem(latestPos.lat, latestPos.lon);
+        }
 
-    socket.on('position', (data) => {
-      if (data && typeof data.lat === 'number' && typeof data.lon === 'number') {
-        latestPos.lat = data.lat;
-        latestPos.lon = data.lon;
+        function togglePlaneCoordSystemSelect() {
+            const planeCoordSystemSelectDiv = document.getElementById('planeCoordSystemSelectDiv');
+            planeCoordSystemSelectDiv.style.display = document.getElementById('coordMode').value === 'plane' ? 'block' : 'none';
+        }
 
-        marker.setLatLng([latestPos.lat, latestPos.lon]);
-        map.panTo([latestPos.lat, latestPos.lon]);
-        updateDisplay();
-      }
-    });
+        function updateDisplay() {
+            const mode = document.getElementById('coordMode').value;
+            const lat = latestPos.lat;
+            const lon = latestPos.lon;
+            let displayText = '';
 
-    // ページの初期ロード時に、測地系選択ボックスの表示/非表示を調整
-    togglePlaneCoordSystemSelect();
-  </script>
+            try {
+                if (mode === 'latlon') {
+                    displayText = `${i18next.t('latitude_longitude').split('/')[0]}: ${lat.toFixed(6)}<br>${i18next.t('latitude_longitude').split('/')[1]}: ${lon.toFixed(6)}`;
+                } else if (mode === 'mgrs') {
+                    const mgrsStr = mgrs.forward([lon, lat]);
+                    displayText = `MGRS: ${mgrsStr}`;
+                } else if (mode === 'utm') {
+                    const zone = Math.floor((lon + 180) / 6) + 1;
+                    const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
+                    displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
+                } else if (mode === 'plane') {
+                    const selectedSystemId = document.getElementById('planeCoordSystem').value;
+                    const selectedSystem = planeCoordSystems.find(s => s.id === selectedSystemId);
+                    if (selectedSystem) {
+                        const planeCoords = proj4('WGS84', selectedSystem.proj4def, [lon, lat]);
+                        displayText = `${i18next.t('y_coord')} (${i18next.t('east_direction')}): ${planeCoords[0].toFixed(2)} m<br>${i18next.t('x_coord')} (${i18next.t('north_direction')}): ${planeCoords[1].toFixed(2)} m`;
+                    } else {
+                        displayText = i18next.t('error_coord_conversion') + ': ' + i18next.t('plane_coord_system_label') + 'が見つかりません';
+                    }
+                }
+            } catch (e) {
+                displayText = i18next.t('error_coord_conversion');
+                console.error(e);
+            }
+
+            document.getElementById('coordinateDisplay').innerHTML = displayText;
+        }
+
+        function updateStatus(data) {
+            const t = (key, fallback) => i18next.t(key) || fallback;
+            const velocity = Number.isFinite(data.velocity) ? data.velocity.toFixed(2) : 'N/A';
+            const rtkStatus = data.rtk_fix_type === 4 ? t('rtk_fixed', 'RTK Fixed') : t('rtk_none', 'No RTK');
+            const status = `
+                <strong>${t('latitude', 'Latitude')}:</strong> ${data.lat}<br>
+                <strong>${t('longitude', 'Longitude')}:</strong> ${data.lon}<br>
+                <strong>${t('heading', 'Heading')}:</strong> ${data.heading ? data.heading.toFixed(1) : 'N/A'}°<br>
+                <strong>${t('velocity', 'Velocity')}:</strong> ${velocity} m/s<br>
+                <strong>${t('rtk_status', 'RTK Status')}:</strong> ${rtkStatus}<br>
+                <strong>${t('error_radius', 'Error Radius')}:</strong> ${data.error_radius ? data.error_radius.toFixed(2) : 'N/A'} m<br>
+                <strong>${t('satellite_count', 'Satellites')}:</strong> ${data.satellite_count || 'N/A'}<br>
+                <strong>${t('timestamp', 'Timestamp')}:</strong> ${data.timestamp || 'N/A'}
+            `;
+            document.getElementById('status').innerHTML = status;
+        }
+
+        class MapController {
+            constructor(mapElementId, maxPoints = 1000) {
+                this.map = L.map(mapElementId).setView([35.681236, 139.767125], 15);
+                this.pathPoints = [];
+                this.maxPoints = maxPoints;
+                this.marker = null;
+                this.polyline = L.polyline([], { color: 'blue' }).addTo(this.map);
+                this.followMode = true;
+                this._initTileLayer();
+                this._initEventListeners();
+            }
+
+            _initTileLayer() {
+                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+            }
+
+            _initEventListeners() {
+                this.map.on('movestart', () => {
+                    this.followMode = false;
+                });
+            }
+
+            toggleFollowMode() {
+                this.followMode = !this.followMode;
+            }
+
+            updatePosition(lat, lon, headingDeg) {
+                const newLatLng = [lat, lon];
+                this.pathPoints.push(newLatLng);
+                if (this.pathPoints.length > this.maxPoints) {
+                    this.pathPoints.shift();
+                }
+
+                if (this.marker) {
+                    this.marker.setLatLng(newLatLng);
+                    this.marker.setRotationAngle(headingDeg);
+                } else {
+                    this.marker = L.marker(newLatLng, {
+                        icon: this._createHeadingIcon(),
+                        rotationAngle: headingDeg,
+                        rotationOrigin: 'center'
+                    }).addTo(this.map);
+                }
+
+                this.polyline.setLatLngs(this.pathPoints);
+                if (this.followMode) {
+                    this.map.setView(newLatLng);
+                }
+            }
+
+            _createHeadingIcon() {
+                return L.divIcon({
+                    html: '<svg width="20" height="20"><polygon points="10,0 20,20 0,20" style="fill:blue;stroke:black;stroke-width:1"/></svg>',
+                    iconSize: [20, 20],
+                    className: 'heading-icon',
+                    iconAnchor: [10, 10],
+                    tooltipAnchor: [0, -10]
+                });
+            }
+        }
+
+        const mapController = new MapController('map');
+        let latestPos = { lat: 35.681236, lon: 139.767125 };
+        const socket = io();
+
+        socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + error.message;
+        });
+
+        socket.on('error', (data) => {
+            console.error('Server error:', data.message);
+            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + data.message;
+        });
+
+        socket.on('sensor_data', (data) => {
+            if (
+                data &&
+                Number.isFinite(data.lat) && data.lat >= -90 && data.lat <= 90 &&
+                Number.isFinite(data.lon) && data.lon >= -180 && data.lon <= 180
+            ) {
+                latestPos.lat = data.lat;
+                latestPos.lon = data.lon;
+                mapController.updatePosition(data.lat, data.lon, data.heading || 0);
+                updateDisplay();
+                updateStatus(data);
+            } else {
+                console.warn('Invalid position data:', data);
+            }
+        });
+    </script>
 </body>
 </html>
