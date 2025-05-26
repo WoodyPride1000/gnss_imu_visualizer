@@ -1,29 +1,66 @@
-from mpu6050 import mpu6050
-from kalman import kalman_filter
+import logging
+import math
 import time
+from datetime import datetime, timezone
+from typing import Dict, Optional
+
+logging.basicConfig(level=logging.INFO, filename='imu.log', format='%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
+
+class DummyIMU:
+    """ダミーIMU（テスト用）"""
+    def get_data(self) -> Dict:
+        try:
+            return {
+                'gyro_z': 0.0,  # 角速度（度/秒）
+                'heading': 0.0,  # ダミーヘディング
+                'timestamp': datetime.now(timezone.utc).isoformat()
+            }
+        except Exception as e:
+            logger.error(f"DummyIMU error: {e}")
+            raise
 
 class IMUReader:
-    def __init__(self, address=0x68):
-        self.sensor = mpu6050(address)
-        self.angle = 0.0
-        self.last_time = time.time()
-        self.x_est_heading, self.p_est_heading = 0.0, 1.0
+    def __init__(self, forced_mode: Optional[str] = None):
+        self.forced_mode = forced_mode
+        self.imu = self._select_imu()
+        self.state = {'x_est_heading': 0.0, 'p_est_heading': 1.0}
+        self.last_time = None
+        self.kalman_filter = KalmanFilter1D(sensor_type="imu")
 
-    def read_heading(self):
+    def _select_imu(self):
         try:
-            gyro_data = self.sensor.get_gyro_data()
-            dt = time.time() - self.last_time
-            self.angle += gyro_data['z'] * dt
-            self.last_time = time.time()
-            self.x_est_heading, self.p_est_heading = kalman_filter(self.angle, self.x_est_heading, self.p_est_heading)
-            return self.x_est_heading
+            if self.forced_mode == 'dummy':
+                logger.info("Using DummyIMU")
+                return DummyIMU()
+            # 実際のIMU実装（例: mpu6050ライブラリ）
+            logger.info("Using DummyIMU (default)")
+            return DummyIMU()
         except Exception as e:
-            print(f"IMU read error: {e}")
-            return self.x_est_heading
+            logger.error(f"IMU selection error: {e}")
+            raise
 
-    def is_connected(self):
+    def get_data(self) -> Dict:
         try:
-            self.sensor.get_accel_data()
-            return True
-        except:
-            return False
+            data = self.imu.get_data()
+            current_time = datetime.now(timezone.utc)
+            dt = (current_time - self.last_time).total_seconds() if self.last_time else 0.0
+            self.last_time = current_time
+
+            # ジャイロ角速度を制御入力としてカルマンフィルター適用
+            self.state['x_est_heading'], self.state['p_est_heading'] = self.kalman_filter.filter(
+                data['heading'], self.state['x_est_heading'], self.state['p_est_heading'], u=data['gyro_z'] * dt
+            )
+
+            # ヘディングを0〜360度に正規化
+            heading = self.state['x_est_heading'] % 360
+            if heading < 0:
+                heading += 360
+
+            return {
+                'heading': heading,
+                'timestamp': current_time.isoformat()
+            }
+        except Exception as e:
+            logger.error(f"IMUReader get_data error: {e}")
+            raise
