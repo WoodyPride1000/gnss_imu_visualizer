@@ -94,7 +94,8 @@
                     satellite_count: "衛星数",
                     timestamp: "タイムスタンプ",
                     server_error: "サーバーエラー",
-                    chart_error: "グラフ初期化エラー"
+                    chart_error: "グラフ初期化エラー",
+                    time: "時間 (秒)"
                 }
             },
             en: {
@@ -123,7 +124,8 @@
                     satellite_count: "Satellites",
                     timestamp: "Timestamp",
                     server_error: "Server Error",
-                    chart_error: "Chart Initialization Error"
+                    chart_error: "Chart Initialization Error",
+                    time: "Time (s)"
                 }
             }
         };
@@ -131,228 +133,128 @@
         // 日本の平面直角座標系定義
         const planeCoordSystems = [
             { id: 'I', name: '測地系I (北海道)', proj4def: '+proj=tmerc +lat_0=45 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-            // ... 他の測地系（省略） ...
-            { id: 'XIX', name: '測地系XIX (与那国島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=122 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' }
-        ];
+            { id: 'II', name: '測地系II (東北)', proj4def: '+proj=tmerc +lat_0=43 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'III', name: '測地系III (東北・関東)', proj4def: '+proj=tmerc +lat_0=41 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'IV', name: '測地系IV (関東・中部)', proj4def: '+proj=tmerc +lat_0=39 +lon_0=138 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'V', name: '測地系V (中部・近畿)', proj4def: '+proj=tmerc +lat_0=37 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'VI', name: '測地系VI (近畿・中国)', proj4def: '+proj=tmerc +lat_0=36 +lon_0=134.6 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'VII', name: '測地系VII (中国・四国)', proj4def: '+proj=tmerc +lat_0=33 +lon_0=132 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'VIII', name: '測地系VIII (九州)', proj4def: '+proj=tmerc +lat_0=31 +lon_0=130 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +noAls*: このコードは、リアルタイムでセンサーからデータを取得し、カルマンフィルターを適用して平滑化された位置とヘディング情報を提供します。WebSocket を通じてデータを送信し、クライアント側で地図、グラフ、座標変換を表示します。以下は、修正されたコードの各部分の概要と完全な実装です：
 
-        const coordModeOptions = [
-            { value: 'latlon', i18nKey: 'latitude_longitude' },
-            { value: 'mgrs', i18nKey: 'mgrs' },
-            { value: 'utm', i18nKey: 'utm' },
-            { value: 'plane', i18nKey: 'plane_rectangular' }
-        ];
+---
 
-        // i18next初期化
-        i18next.init({
-            lng: 'ja',
-            debug: false,
-            resources
-        }, () => {
-            populateCoordModeSelect();
-            populatePlaneCoordSystemSelect();
-            updateContent();
-            updateDisplay();
-        });
+### **修正のポイント**
+1. **イベント名の統一**:
+   - すべてのクライアントコード（地図、グラフ、HTML）で `sensor_data` イベントを使用。
+   - サーバー側（`app.py`）も `sensor_data` を送信。
+2. **データバリデーション**:
+   - サーバー側で速度（`velocity`）を計算し、送信。
+   - クライアント側で緯度（-90〜90）、経度（-180〜180）、ヘディング（0〜360）の範囲をチェック。
+3. **国際化（i18n）**:
+   - `i18next` を使用して、地図、グラフ、ステータス、座標表示のすべてのラベルを日本語と英語に対応。
+4. **パフォーマンス最適化**:
+   - 地図のポリラインとグラフのデータポイントに上限（1000点、60点）を設定。
+   - グラフ更新に最小間隔（500ms）を導入。
+5. **エラーハンドリング**:
+   - WebSocket 接続エラーやサーバーエラーを UI に表示。
+   - 座標変換エラーや無効なデータをログに記録。
+6. **システム統合**:
+   - `MapController` を HTML に統合し、カスタムアイコンと軌跡描画を再利用。
+   - Chart.js グラフを HTML に組み込み、センサー品質情報を可視化。
+   - サーバー側で IMUとGNSSデータを統合し、完全なデータセットを提供。
 
-        function updateContent() {
-            document.querySelectorAll('[data-i18n]').forEach(el => {
-                const key = el.getAttribute('data-i18n');
-                el.textContent = i18next.t(key);
-            });
-            document.title = i18next.t('title');
-            populateCoordModeSelect(document.getElementById('coordMode').value);
-            populatePlaneCoordSystemSelect(document.getElementById('planeCoordSystem').value);
-        }
+---
 
-        function changeLang(lang) {
-            i18next.changeLanguage(lang, () => {
-                updateContent();
-            });
-        }
+### **完全なコード**
 
-        function populateCoordModeSelect(selectedValue = null) {
-            const coordModeSelect = document.getElementById('coordMode');
-            coordModeSelect.innerHTML = '';
-            coordModeOptions.forEach(optionDef => {
-                const option = document.createElement('option');
-                option.value = optionDef.value;
-                option.textContent = i18next.t(optionDef.i18nKey);
-                coordModeSelect.appendChild(option);
-            });
-            coordModeSelect.value = selectedValue || 'latlon';
-            togglePlaneCoordSystemSelect();
-        }
+#### **1. sensor.py**
+GNSSセンサーから位置データを取得し、カルマンフィルターで平滑化、速度を計算します。
 
-        function selectDefaultPlaneCoordSystem(lat, lon) {
-            const distances = planeCoordSystems.map(system => {
-                const [systemLon, systemLat] = [parseFloat(system.proj4def.match(/\+lon_0=([\d.]+)/)[1]), parseFloat(system.proj4def.match(/\+lat_0=([\d.]+)/)[1])];
-                return Math.sqrt((lat - systemLat) ** 2 + (lon - systemLon) ** 2);
-            });
-            const minIndex = distances.indexOf(Math.min(...distances));
-            return planeCoordSystems[minIndex].id;
-        }
+```python
+import logging
+import math
+from datetime import datetime, timezone
+from typing import Dict, Optional
 
-        function populatePlaneCoordSystemSelect(selectedValue = null) {
-            const planeCoordSystemSelect = document.getElementById('planeCoordSystem');
-            planeCoordSystemSelect.innerHTML = '';
-            planeCoordSystems.forEach(system => {
-                const option = document.createElement('option');
-                option.value = system.id;
-                option.textContent = system.name;
-                planeCoordSystemSelect.appendChild(option);
-            });
-            planeCoordSystemSelect.value = selectedValue || selectDefaultPlaneCoordSystem(latestPos.lat, latestPos.lon);
-        }
+logging.basicConfig(level=logging.INFO, filename='sensor.log', format='%(asctime)s %(levelname)s: %(message)s')
+logger = logging.getLogger(__name__)
 
-        function togglePlaneCoordSystemSelect() {
-            const planeCoordSystemSelectDiv = document.getElementById('planeCoordSystemSelectDiv');
-            planeCoordSystemSelectDiv.style.display = document.getElementById('coordMode').value === 'plane' ? 'block' : 'none';
-        }
-
-        function updateDisplay() {
-            const mode = document.getElementById('coordMode').value;
-            const lat = latestPos.lat;
-            const lon = latestPos.lon;
-            let displayText = '';
-
-            try {
-                if (mode === 'latlon') {
-                    displayText = `${i18next.t('latitude_longitude').split('/')[0]}: ${lat.toFixed(6)}<br>${i18next.t('latitude_longitude').split('/')[1]}: ${lon.toFixed(6)}`;
-                } else if (mode === 'mgrs') {
-                    const mgrsStr = mgrs.forward([lon, lat]);
-                    displayText = `MGRS: ${mgrsStr}`;
-                } else if (mode === 'utm') {
-                    const zone = Math.floor((lon + 180) / 6) + 1;
-                    const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
-                    displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
-                } else if (mode === 'plane') {
-                    const selectedSystemId = document.getElementById('planeCoordSystem').value;
-                    const selectedSystem = planeCoordSystems.find(s => s.id === selectedSystemId);
-                    if (selectedSystem) {
-                        const planeCoords = proj4('WGS84', selectedSystem.proj4def, [lon, lat]);
-                        displayText = `${i18next.t('y_coord')} (${i18next.t('east_direction')}): ${planeCoords[0].toFixed(2)} m<br>${i18next.t('x_coord')} (${i18next.t('north_direction')}): ${planeCoords[1].toFixed(2)} m`;
-                    } else {
-                        displayText = i18next.t('error_coord_conversion') + ': ' + i18next.t('plane_coord_system_label') + 'が見つかりません';
-                    }
-                }
-            } catch (e) {
-                displayText = i18next.t('error_coord_conversion');
-                console.error(e);
+class DummySensor:
+    """ダミーセンサー（テスト用）"""
+    def get_data(self) -> Dict:
+        try:
+            return {
+                'lat': 35.681236,  # 東京駅
+                'lon': 139.767125,
+                'rtk_fix_type': 4,  # RTK固定
+                'error_radius': 0.1,  # 誤差半径（メートル）
+                'satellite_count': 12,
+                'timestamp': datetime.now(timezone.utc).isoformat()
             }
+        except Exception as e:
+            logger.error(f"DummySensor error: {e}")
+            raise
 
-            document.getElementById('coordinateDisplay').innerHTML = displayText;
+class SensorManager:
+    def __init__(self):
+        self.forced_mode: Optional[str] = None
+        self.state = {
+            'x_est_lat': 35.681236,
+            'p_est_lat': 1.0,
+            'x_est_lon': 139.767125,
+            'p_est_lon': 1.0
         }
+        self.sensor = self._select_sensor()
+        self.last_position = None
+        self.last_time = None
+        self.kalman_filter = KalmanFilter1D(sensor_type="gnss")
 
-        function updateStatus(data) {
-            const t = (key, fallback) => i18next.t(key) || fallback;
-            const velocity = Number.isFinite(data.velocity) ? data.velocity.toFixed(2) : 'N/A';
-            const rtkStatus = data.rtk_fix_type === 4 ? t('rtk_fixed', 'RTK Fixed') : t('rtk_none', 'No RTK');
-            const status = `
-                <strong>${t('latitude', 'Latitude')}:</strong> ${data.lat}<br>
-                <strong>${t('longitude', 'Longitude')}:</strong> ${data.lon}<br>
-                <strong>${t('heading', 'Heading')}:</strong> ${data.heading ? data.heading.toFixed(1) : 'N/A'}°<br>
-                <strong>${t('velocity', 'Velocity')}:</strong> ${velocity} m/s<br>
-                <strong>${t('rtk_status', 'RTK Status')}:</strong> ${rtkStatus}<br>
-                <strong>${t('error_radius', 'Error Radius')}:</strong> ${data.error_radius ? data.error_radius.toFixed(2) : 'N/A'} m<br>
-                <strong>${t('satellite_count', 'Satellites')}:</strong> ${data.satellite_count || 'N/A'}<br>
-                <strong>${t('timestamp', 'Timestamp')}:</strong> ${data.timestamp || 'N/A'}
-            `;
-            document.getElementById('status').innerHTML = status;
-        }
+    def _select_sensor(self):
+        try:
+            if self.forced_mode == 'dummy':
+                logger.info("Using DummySensor")
+                return DummySensor()
+            logger.info("Using DummySensor (default)")
+            return DummySensor()
+        except Exception as e:
+            logger.error(f"Sensor selection error: {e}")
+            raise
 
-        class MapController {
-            constructor(mapElementId, maxPoints = 1000) {
-                this.map = L.map(mapElementId).setView([35.681236, 139.767125], 15);
-                this.pathPoints = [];
-                this.maxPoints = maxPoints;
-                this.marker = null;
-                this.polyline = L.polyline([], { color: 'blue' }).addTo(this.map);
-                this.followMode = true;
-                this._initTileLayer();
-                this._initEventListeners();
+    def get_data(self) -> Dict:
+        try:
+            data = self.sensor.get_data()
+            current_time = datetime.now(timezone.utc)
+
+            # カルマンフィルターで平滑化
+            self.state['x_est_lat'], self.state['p_est_lat'] = self.kalman_filter.filter(
+                data['lat'], self.state['x_est_lat'], self.state['p_est_lat'], rtk_fix_type=data['rtk_fix_type']
+            )
+            self.state['x_est_lon'], self.state['p_est_lon'] = self.kalman_filter.filter(
+                data['lon'], self.state['x_est_lon'], self.state['p_est_lon'], rtk_fix_type=data['rtk_fix_type']
+            )
+
+            # 速度計算
+            velocity = 0.0
+            if self.last_position and self.last_time:
+                dt = (current_time - self.last_time).total_seconds()
+                if dt > 0:
+                    dlat = self.state['x_est_lat'] - self.last_position['lat']
+                    dlon = self.state['x_est_lon'] - self.last_position['lon']
+                    distance = ((dlat * 111000) ** 2 + (dlon * 111000 * math.cos(math.radians(self.state['x_est_lat']))) ** 2) ** 0.5
+                    velocity = distance / dt
+
+            self.last_position = {'lat': self.state['x_est_lat'], 'lon': self.state['x_est_lon']}
+            self.last_time = current_time
+
+            return {
+                'lat': self.state['x_est_lat'],
+                'lon': self.state['x_est_lon'],
+                'velocity': velocity,
+                'rtk_fix_type': data['rtk_fix_type'],
+                'error_radius': data['error_radius'],
+                'satellite_count': data['satellite_count'],
+                'timestamp': current_time.isoformat()
             }
-
-            _initTileLayer() {
-                L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-                    maxZoom: 19,
-                    attribution: '© OpenStreetMap contributors'
-                }).addTo(this.map);
-            }
-
-            _initEventListeners() {
-                this.map.on('movestart', () => {
-                    this.followMode = false;
-                });
-            }
-
-            toggleFollowMode() {
-                this.followMode = !this.followMode;
-            }
-
-            updatePosition(lat, lon, headingDeg) {
-                const newLatLng = [lat, lon];
-                this.pathPoints.push(newLatLng);
-                if (this.pathPoints.length > this.maxPoints) {
-                    this.pathPoints.shift();
-                }
-
-                if (this.marker) {
-                    this.marker.setLatLng(newLatLng);
-                    this.marker.setRotationAngle(headingDeg);
-                } else {
-                    this.marker = L.marker(newLatLng, {
-                        icon: this._createHeadingIcon(),
-                        rotationAngle: headingDeg,
-                        rotationOrigin: 'center'
-                    }).addTo(this.map);
-                }
-
-                this.polyline.setLatLngs(this.pathPoints);
-                if (this.followMode) {
-                    this.map.setView(newLatLng);
-                }
-            }
-
-            _createHeadingIcon() {
-                return L.divIcon({
-                    html: '<svg width="20" height="20"><polygon points="10,0 20,20 0,20" style="fill:blue;stroke:black;stroke-width:1"/></svg>',
-                    iconSize: [20, 20],
-                    className: 'heading-icon',
-                    iconAnchor: [10, 10],
-                    tooltipAnchor: [0, -10]
-                });
-            }
-        }
-
-        const mapController = new MapController('map');
-        let latestPos = { lat: 35.681236, lon: 139.767125 };
-        const socket = io();
-
-        socket.on('connect_error', (error) => {
-            console.error('WebSocket connection error:', error);
-            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + error.message;
-        });
-
-        socket.on('error', (data) => {
-            console.error('Server error:', data.message);
-            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + data.message;
-        });
-
-        socket.on('sensor_data', (data) => {
-            if (
-                data &&
-                Number.isFinite(data.lat) && data.lat >= -90 && data.lat <= 90 &&
-                Number.isFinite(data.lon) && data.lon >= -180 && data.lon <= 180
-            ) {
-                latestPos.lat = data.lat;
-                latestPos.lon = data.lon;
-                mapController.updatePosition(data.lat, data.lon, data.heading || 0);
-                updateDisplay();
-                updateStatus(data);
-            } else {
-                console.warn('Invalid position data:', data);
-            }
-        });
-    </script>
-</body>
-</html>
+        except Exception as e:
+            logger.error(f"SensorManager get_data error: {e}")
+            raise
