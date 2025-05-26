@@ -44,7 +44,7 @@
 
 sudo apt-get install i2c-tools
 sudo pip install mpu6050-raspberrypi
-
+pip install flask flask-socketio
 
 git clone https://github.com/WoodyPride1970/gnss_imu_visualizer.git
 cd gnss_imu_visualizer
@@ -54,4 +54,8 @@ pip install -r requirements.txt
 python run.py
 
 ---
+
+run.py を実行（python run.py）。
+
+ブラウザで http://localhost:5000 にアクセス。
 
