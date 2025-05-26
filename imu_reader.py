@@ -12,8 +12,8 @@ class DummyIMU:
     def get_data(self) -> Dict:
         try:
             return {
-                'gyro_z': 0.0,  # 角速度（度/秒）
-                'heading': 0.0,  # ダミーヘディング
+                'gyro_z': 0.0,
+                'heading': 0.0,
                 'timestamp': datetime.now(timezone.utc).isoformat()
             }
         except Exception as e:
@@ -33,7 +33,6 @@ class IMUReader:
             if self.forced_mode == 'dummy':
                 logger.info("Using DummyIMU")
                 return DummyIMU()
-            # 実際のIMU実装（例: mpu6050ライブラリ）
             logger.info("Using DummyIMU (default)")
             return DummyIMU()
         except Exception as e:
@@ -47,12 +46,12 @@ class IMUReader:
             dt = (current_time - self.last_time).total_seconds() if self.last_time else 0.0
             self.last_time = current_time
 
-            # ジャイロ角速度を制御入力としてカルマンフィルター適用
+            # カルマンフィルター適用
             self.state['x_est_heading'], self.state['p_est_heading'] = self.kalman_filter.filter(
                 data['heading'], self.state['x_est_heading'], self.state['p_est_heading'], u=data['gyro_z'] * dt
             )
 
-            # ヘディングを0〜360度に正規化
+            # ヘディング正規化
             heading = self.state['x_est_heading'] % 360
             if heading < 0:
                 heading += 360
