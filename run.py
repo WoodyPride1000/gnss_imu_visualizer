@@ -46,4 +46,4 @@ def emit_sensor_data():
 
 if __name__ == '__main__':
     socketio.start_background_task(emit_sensor_data)
-    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0, port=5000, debug=False)
