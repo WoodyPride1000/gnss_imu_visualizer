@@ -5,29 +5,65 @@
   <title>GNSS-IMU Visualizer 取扱説明書</title>
   <style>
     body {
-      font-family: sans-serif;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
       line-height: 1.6;
       padding: 2rem;
-      max-width: 900px;
+      max-width: 800px;
       margin: auto;
       background-color: #f9f9f9;
+      color: #333;
+    }
+    @media (prefers-color-scheme: dark) {
+      body {
+        background-color: #1e1e1e;
+        color: #e0e0e0;
+      }
+      code, pre {
+        background-color: #2d2d2d;
+        color: #e0e0e0;
+      }
+      h1, h2, h3 {
+        color: #a0c0e0;
+      }
     }
     h1, h2, h3 {
       color: #2c3e50;
     }
     code {
       background-color: #eee;
-      padding: 2px 4px;
+      padding: 2px 6px;
       border-radius: 4px;
+      font-size: 0.9em;
     }
     pre {
       background: #eee;
       padding: 1em;
       overflow-x: auto;
-      border-radius: 5px;
+      border-radius: 6px;
+      font-size: 0.9em;
+      line-height: 1.4;
     }
-    ul {
+    ul, ol {
       margin-left: 1.5em;
+      margin-bottom: 1em;
+    }
+    a {
+      color: #1a73e8;
+      text-decoration: none;
+    }
+    a:hover {
+      text-decoration: underline;
+    }
+    @media (max-width: 600px) {
+      body {
+        padding: 1rem;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+      pre {
+        font-size: 0.8em;
+      }
     }
   </style>
 </head>
@@ -37,72 +73,110 @@
 
   <h2>概要</h2>
   <p>
-    このシステムは、GNSS（GPS）およびIMUセンサを使用してリアルタイムに位置・方位情報を取得・可視化します。
-    RTK-GNSSの補正やKalman Filterによるデータ統合、履歴誤差の可視化にも対応しています。
+    GNSS-IMU Visualizer は、GNSS（GPS）と IMU（慣性計測装置）センサーを用いて、リアルタイムで位置、方位、速度情報を取得・可視化するシステムです。RTK-GNSS による高精度測位、カルマンフィルターによるデータ平滑化、誤差履歴のグラフ表示、座標系変換、多言語対応を備えています。
   </p>
 
   <h2>機能一覧</h2>
   <ul>
-    <li>GPS/IMUのリアルタイム表示</li>
-    <li>Kalman Filter による位置補正</li>
-    <li>RTK補正の状態（FIX/FLOAT/NONE）表示</li>
-    <li>履歴誤差のグラフ表示</li>
-    <li>センサとシミュレータの自動/手動切り替え</li>
-    <li>モバイル対応のレスポンシブUI</li>
+    <li>GNSS/IMU データのリアルタイム表示（位置、方位、速度）</li>
+    <li>カルマンフィルターによる位置・方位の平滑化</li>
+    <li>RTK 補正状態（FIX/FLOAT/NONE）の表示</li>
+    <li>誤差履歴（エラーラディウス、RTK状態、衛星数）のグラフ表示</li>
+    <li>座標系切り替え（緯度経度、MGRS、UTM、日本の平面直角座標系）</li>
+    <li>多言語対応（日本語、英語）</li>
+    <li>実センサーとシミュレータ（ダミーデータ）の自動/手動切り替え</li>
+    <li>モバイル対応のレスポンシブ UI</li>
   </ul>
 
   <h2>構成ファイル</h2>
   <pre><code>
-run.py             - アプリケーションの起動スクリプト
-sensor.py          - 実センサ/シミュレータの切替制御
-kalman.py          - Kalman Filterの実装
-templates/index.html  - UI画面
-public/map.js      - 地図描画とSocketIO受信
-public/chart.js    - 履歴誤差グラフ表示
+app.py             - Flask サーバーと WebSocket アプリケーション
+sensor.py          - GNSS センサー制御（実センサー/シミュレータ切り替え）
+imu_reader.py      - IMU センサー制御（実センサー/シミュレータ切り替え）
+kalman.py          - カルマンフィルターの実装
+templates/index.html - UI 画面（地図、グラフ、座標変換、ステータス表示）
 docs/manual.html   - 本マニュアル（HTML形式）
   </code></pre>
 
   <h2>使用環境</h2>
   <ul>
-    <li>Python 3.7+</li>
-    <li>Flask / Flask-SocketIO</li>
-    <li>Leaflet.js / Chart.js（CDN）</li>
-    <li>Raspberry Pi対応（IMU/GPS接続時）</li>
+    <li>Python 3.8 以上</li>
+    <li>依存ライブラリ: Flask, Flask-SocketIO（<code>requirements.txt</code> を参照）</li>
+    <li>クライアントライブラリ（CDN 経由）: Leaflet.js, Chart.js, Socket.IO, proj4js, mgrs, i18next</li>
+    <li>ハードウェア: Raspberry Pi 対応（IMU/GNSS センサー接続時）</li>
+    <li>ブラウザ: Chrome, Firefox, Safari（最新バージョン推奨）</li>
   </ul>
 
   <h2>インストール手順</h2>
+  <p>以下の手順で環境を構築し、アプリケーションを起動します。</p>
   <pre><code>
+# 仮想環境の作成と有効化
 python -m venv venv
-source venv/bin/activate
-pip install -r requirements.txt
-python run.py
+source venv/bin/activate  # Windows の場合は: venv\Scripts\activate
+
+# 依存ライブラリのインストール
+pip install flask flask-socketio
+
+# アプリケーションの起動
+python app.py
   </code></pre>
-  <p>ブラウザで <code>http://localhost:5000</code> にアクセスします。</p>
+  <p>
+    起動後、ブラウザで <code>http://localhost:5000</code> にアクセスします。外部デバイスからアクセスする場合は、サーバーの IP アドレス（例: <code>http://192.168.x.x:5000</code>）を使用します。
+  </p>
 
   <h2>使い方</h2>
   <ol>
-    <li>センサ接続：GPS/IMUを接続し、起動すると自動検出</li>
-    <li>データ表示：地図上にリアルタイムで位置・方位を表示</li>
-    <li>RTK精度表示：誤差円の色とサイズで精度を可視化</li>
-    <li>履歴確認：履歴グラフで位置精度推移を確認</li>
-    <li>手動切替：UI上のボタンで実センサ/シミュレータを切り替え</li>
+    <li>
+      <strong>センサー接続</strong>：
+      GNSS モジュール（例: RTK-GNSS）と IMU（例: MPU6050）を接続します。接続がない場合、システムは自動でシミュレータ（ダミーデータ）モードに切り替わります。
+    </li>
+    <li>
+      <strong>データ表示</strong>：
+      地図上に現在位置（マーカー）と移動軌跡（ポリライン）がリアルタイムで表示されます。マーカーは IMU のヘディングに基づいて回転します。
+    </li>
+    <li>
+      <strong>座標系選択</strong>：
+      UI の「座標系切替」セレクトボックスで、緯度経度、MGRS、UTM、日本の平面直角座標系を選択できます。平面直角座標系を選択した場合、測地系（I〜XIX）をさらに選択可能です。
+    </li>
+    <li>
+      <strong>言語切り替え</strong>：
+      右上のセレクトボックスで日本語または英語を選択し、UI の表示言語を切り替えます。
+    </li>
+    <li>
+      <strong>ステータス確認</strong>：
+      位置（緯度、経度）、ヘディング、速度、RTK状態（FIX/FLOAT/NONE）、エラーラディウス、衛星数、タイムスタンプがリアルタイムで表示されます。
+    </li>
+    <li>
+      <strong>グラフ確認</strong>：
+      下部のグラフで、エラーラディウス、RTK状態、衛星数の履歴を時系列で確認できます。データは 60 ポイント（約 1 分間）まで保持されます。
+    </li>
+    <li>
+      <strong>センサー切り替え</strong>：
+      実センサーが接続されていない場合、システムは自動でシミュレータモードに切り替わります。手動切り替えは `sensor.py` または `imu_reader.py` の `forced_mode` を `dummy` に設定することで可能です。
+    </li>
   </ol>
 
   <h2>注意事項</h2>
   <ul>
-    <li>GNSSは屋外で利用することが推奨されます</li>
-    <li>IMUは使用前にキャリブレーションが必要な場合があります</li>
-    <li>センサ接続が無い場合は自動でシミュレーションに切り替わります</li>
+    <li>GNSS センサーは屋外で使用することを推奨します。屋内では衛星信号が弱く、精度が低下する場合があります。</li>
+    <li>IMU センサーは使用前にキャリブレーションが必要です。特にジャイロのドリフト補正が重要です。</li>
+    <li>日本の平面直角座標系を使用する場合、現在位置に応じた適切な測地系（例: 東京なら VI）を選択してください。</li>
+    <li>WebSocket 接続が不安定な場合、ネットワーク環境を確認し、サーバーとクライアントが同じネットワーク内にあることを確認してください。</li>
+    <li>シミュレータモードでは、固定データ（例: 東京駅の位置）が使用されます。実際のセンサーデータと異なる場合があります。</li>
   </ul>
 
   <h2>サポート</h2>
   <p>
-    GitHub: <a href="https://github.com/WoodyPride1970/gnss_imu_visualizer" target="_blank">
-    https://github.com/WoodyPride1970/gnss_imu_visualizer</a>
+    質問やバグ報告は GitHub の Issues ページをご利用ください：<br>
+    <a href="https://github.com/WoodyPride1970/gnss_imu_visualizer" target="_blank">
+      https://github.com/WoodyPride1970/gnss_imu_visualizer
+    </a>
   </p>
 
   <h2>ライセンス</h2>
-  <p>MIT ライセンスに基づいて公開されています。</p>
+  <p>
+    本ソフトウェアは MIT ライセンスの下で公開されています。詳細はリポジトリの <code>LICENSE</code> ファイルを参照してください。
+  </p>
 
 </body>
 </html>
