@@ -1,11 +1,11 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-    <meta charset="UTF-8" />
+    <meta charset="UTF-8">
     <title data-i18n="title">GNSS+IMU ビジュアライザー</title>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <meta name="viewport" content="width=device-width", initial-scale="1">
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
     <style>
         #map, #errorChartContainer {
             width: 100%;
@@ -22,10 +22,10 @@
             flex-grow: 1;
         }
         .heading-icon {
-            font-size: 16px;
+            font-size: 24px;
             color: blue;
             text-align: center;
-            line-height: 20px;
+            line-height: 24px;
         }
     </style>
 </head>
@@ -42,15 +42,17 @@
         <div class="form-group-row">
             <div>
                 <label for="coordMode" data-i18n="coord_mode_label"></label>
-                <select id="coordMode" class="form-select w-auto" onchange="updateDisplay(); togglePlaneCoordSystemSelect();"></select>
+                <select id="coordMode" class="form-select w-auto" onchange="updateDisplay(); togglePlaneCoordSystemSelect();">
+                </select>
             </div>
             <div id="planeCoordSystemSelectDiv" style="display: none;">
                 <label for="planeCoordSystem" data-i18n="plane_coord_system_label"></label>
-                <select id="planeCoordSystem" class="form-select w-auto" onchange="updateDisplay()"></select>
+                <select id="planeCoordSystem" class="form-select w-auto" onchange="updateDisplay()">
+                </select>
             </div>
         </div>
 
-        <div id="status" class="mb-3" style="font-family: monospace;"></div>
+<div id="status" class="mb-3" style="font-family: monospace;"></div>
         <div id="coordinateDisplay" class="mb-3" style="font-family: monospace;"></div>
         <div id="map" class="mb-3"></div>
         <div id="errorChartContainer" class="mb-3">
@@ -71,7 +73,7 @@
             ja: {
                 translation: {
                     title: "GNSS+IMU ビジュアライザー",
-                    coord_mode_label: "座標系切替",
+                    coord_mode_label: "座標系切換",
                     latitude_longitude: "緯度経度",
                     mgrs: "MGRS",
                     utm: "UTM",
@@ -134,127 +136,373 @@
         const planeCoordSystems = [
             { id: 'I', name: '測地系I (北海道)', proj4def: '+proj=tmerc +lat_0=45 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
             { id: 'II', name: '測地系II (東北)', proj4def: '+proj=tmerc +lat_0=43 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-            { id: 'III', name: '測地系III (東北・関東)', proj4def: '+proj=tmerc +lat_0=41 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'III', name: '東北・関東 (東北・関東)', proj4def: '+proj=tmerc +lat_0=41 +lon_0=140 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
             { id: 'IV', name: '測地系IV (関東・中部)', proj4def: '+proj=tmerc +lat_0=39 +lon_0=138 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-            { id: 'V', name: '測地系V (中部・近畿)', proj4def: '+proj=tmerc +lat_0=37 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'V', name: '測地系V (中部・近)', proj4def: '+proj=tmerc +lat_0=37 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0,0 +units=m +no_defs' },
             { id: 'VI', name: '測地系VI (近畿・中国)', proj4def: '+proj=tmerc +lat_0=36 +lon_0=134.6 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
             { id: 'VII', name: '測地系VII (中国・四国)', proj4def: '+proj=tmerc +lat_0=33 +lon_0=132 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
-            { id: 'VIII', name: '測地系VIII (九州)', proj4def: '+proj=tmerc +lat_0=31 +lon_0=130 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +noAls*: このコードは、リアルタイムでセンサーからデータを取得し、カルマンフィルターを適用して平滑化された位置とヘディング情報を提供します。WebSocket を通じてデータを送信し、クライアント側で地図、グラフ、座標変換を表示します。以下は、修正されたコードの各部分の概要と完全な実装です：
+            { id: 'VIII', name: '測地系VIII (九州)', proj4def: '+proj=tmerc +lat_0=31 +lon_0=130 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'IX', name: '測地系IX (沖縄)', proj4def: '+proj=tmerc +lat_0=29 +lon_0=129 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'X', name: '測得系X (沖縄周辺)', proj4def: '+proj=tmerc +lat_0=27 +lon_0=128 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XI', name: '測地系XI (小笠原)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=142 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XII', name: '測地系XII (南鳥島)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=154 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XIII', name: '測地系XIII (沖ノ鳥島)', proj4def: '+proj=tmerc +lat_0=21 +lon_0=136 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XIV', name: '測地系XIV (南硫黄島)', proj4def: '+proj=tmerc +lat_0=20 +lon_0=145 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XV', name: '測地系XV (火山列島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=141 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XVI', name: '測地系XVI (大東諸島)', proj4def: '+proj=tmerc +lat_0=25 +lon_0=131 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XVII', name: '測地系XVII (琉球諸島南部)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=124 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XVIII', name: '測地系XVIII (尖閣諸島)', proj4def: '+proj=tmerc +lat_0=26 +lon_0=123 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' },
+            { id: 'XIX', name: '測地系XIX (与那国)', proj4def: '+proj=tmerc +lat_0=24 +lon_0=122 +k=0.9999 +x_0=0 +y_0=0 +ellps=GRS80 +towgs84=0,0,0,0,0,0,0 +units=m +no_defs' }
+        ];
 
----
+        const coordModeOptions = [
+            { value: 'latlon', i18nKey: 'latitude_longitude' },
+            { value: 'mgrs', i18nKey: 'mgrs' },
+            { value: 'utm', i18nKey: 'utm' },
+            { value: 'plane', i18nKey: 'plane_rectangular' }
+        ];
 
-### **修正のポイント**
-1. **イベント名の統一**:
-   - すべてのクライアントコード（地図、グラフ、HTML）で `sensor_data` イベントを使用。
-   - サーバー側（`app.py`）も `sensor_data` を送信。
-2. **データバリデーション**:
-   - サーバー側で速度（`velocity`）を計算し、送信。
-   - クライアント側で緯度（-90〜90）、経度（-180〜180）、ヘディング（0〜360）の範囲をチェック。
-3. **国際化（i18n）**:
-   - `i18next` を使用して、地図、グラフ、ステータス、座標表示のすべてのラベルを日本語と英語に対応。
-4. **パフォーマンス最適化**:
-   - 地図のポリラインとグラフのデータポイントに上限（1000点、60点）を設定。
-   - グラフ更新に最小間隔（500ms）を導入。
-5. **エラーハンドリング**:
-   - WebSocket 接続エラーやサーバーエラーを UI に表示。
-   - 座標変換エラーや無効なデータをログに記録。
-6. **システム統合**:
-   - `MapController` を HTML に統合し、カスタムアイコンと軌跡描画を再利用。
-   - Chart.js グラフを HTML に組み込み、センサー品質情報を可視化。
-   - サーバー側で IMUとGNSSデータを統合し、完全なデータセットを提供。
+        // i18next初期化
+        i18next.init({
+            lng: 'ja',
+            debug: true,
+            resources
+        }, () => {
+            populateCoordModeSelect();
+            populatePlaneCoordSystemSelect();
+            updateContent();
+            updateDisplay();
+        });
 
----
-
-### **完全なコード**
-
-#### **1. sensor.py**
-GNSSセンサーから位置データを取得し、カルマンフィルターで平滑化、速度を計算します。
-
-```python
-import logging
-import math
-from datetime import datetime, timezone
-from typing import Dict, Optional
-
-logging.basicConfig(level=logging.INFO, filename='sensor.log', format='%(asctime)s %(levelname)s: %(message)s')
-logger = logging.getLogger(__name__)
-
-class DummySensor:
-    """ダミーセンサー（テスト用）"""
-    def get_data(self) -> Dict:
-        try:
-            return {
-                'lat': 35.681236,  # 東京駅
-                'lon': 139.767125,
-                'rtk_fix_type': 4,  # RTK固定
-                'error_radius': 0.1,  # 誤差半径（メートル）
-                'satellite_count': 12,
-                'timestamp': datetime.now(timezone.utc).isoformat()
-            }
-        except Exception as e:
-            logger.error(f"DummySensor error: {e}")
-            raise
-
-class SensorManager:
-    def __init__(self):
-        self.forced_mode: Optional[str] = None
-        self.state = {
-            'x_est_lat': 35.681236,
-            'p_est_lat': 1.0,
-            'x_est_lon': 139.767125,
-            'p_est_lon': 1.0
+        function updateContent() {
+            document.querySelectorAll('[data-i18n]').forEach(el => {
+                const key = el.getAttribute('data-i18n');
+                el.textContent = i18next.t(key);
+            });
+            document.title = i18next.t('title');
+            populateCoordModeSelect(document.getElementById('coordMode').value);
+            populatePlaneCoordSystemSelect(document.getElementById('planeCoordSystem').value);
+            // グラフラベルを更新
+            chartData.datasets[0].label = i18next.t('error_radius', 'Error Radius (m)');
+            chartData.datasets[1].label = i18next.t('rtk_fix_type', 'RTK Fix Type');
+            chartData.datasets[2].label = i18next.t('satellite_count', 'Satellite Count');
+            errorChart.options.scales.y.title.text = i18next.t('error_radius', 'Error Radius (m)');
+            errorChart.options.scales.yFix.title.text = i18next.t('rtk_fix_type', 'RTK Fix Type');
+            errorChart.options.scales.ySat.title.text = i18next.t('satellite_count', 'Satellite Count');
+            errorChart.options.scales.x.title.text = i18next.t('time', 'Time (s)');
+            errorChart.update();
         }
-        self.sensor = self._select_sensor()
-        self.last_position = None
-        self.last_time = None
-        self.kalman_filter = KalmanFilter1D(sensor_type="gnss")
 
-    def _select_sensor(self):
-        try:
-            if self.forced_mode == 'dummy':
-                logger.info("Using DummySensor")
-                return DummySensor()
-            logger.info("Using DummySensor (default)")
-            return DummySensor()
-        except Exception as e:
-            logger.error(f"Sensor selection error: {e}")
-            raise
+        function changeLang(lang) {
+            i18next.changeLanguage(lang, () => {
+                updateContent();
+            });
+        }
 
-    def get_data(self) -> Dict:
-        try:
-            data = self.sensor.get_data()
-            current_time = datetime.now(timezone.utc)
+        function populateCoordModeSelect(selectedValue = null) {
+            const coordModeSelect = document.getElementById('coordMode');
+            coordModeSelect.innerHTML = '';
+            coordModeOptions.forEach(optionDef => {
+                const option = document.createElement('option');
+                option.value = optionDef.value;
+                option.textContent = i18next.t(optionDef.i18nKey);
+                coordModeSelect.appendChild(option);
+            });
+            coordModeSelect.value = selectedValue || 'latlon';
+            togglePlaneCoordSystemSelect();
+        }
 
-            # カルマンフィルターで平滑化
-            self.state['x_est_lat'], self.state['p_est_lat'] = self.kalman_filter.filter(
-                data['lat'], self.state['x_est_lat'], self.state['p_est_lat'], rtk_fix_type=data['rtk_fix_type']
-            )
-            self.state['x_est_lon'], self.state['p_est_lon'] = self.kalman_filter.filter(
-                data['lon'], self.state['x_est_lon'], self.state['p_est_lon'], rtk_fix_type=data['rtk_fix_type']
-            )
+        function selectDefaultPlaneCoordSystem(lat, lon) {
+            const distances = planeCoordSystems.map(system => {
+                const [systemLon, systemLat] = [parseFloat(system.proj4def.match(/\+lon_0=([\d.]+)/)[1]), parseFloat(system.proj4def.match(/\+lat_0=([\d.]+)/)[1])];
+                return Math.sqrt((lat - systemLat) ** 2 + (lon - systemLon) ** 2);
+            });
+            const minIndex = distances.indexOf(Math.min(...distances));
+            return planeCoordSystems[minIndex].id;
+        }
 
-            # 速度計算
-            velocity = 0.0
-            if self.last_position and self.last_time:
-                dt = (current_time - self.last_time).total_seconds()
-                if dt > 0:
-                    dlat = self.state['x_est_lat'] - self.last_position['lat']
-                    dlon = self.state['x_est_lon'] - self.last_position['lon']
-                    distance = ((dlat * 111000) ** 2 + (dlon * 111000 * math.cos(math.radians(self.state['x_est_lat']))) ** 2) ** 0.5
-                    velocity = distance / dt
+        function populatePlaneCoordSystemSelect(selectedValue = null) {
+            const planeCoordSystemSelect = document.getElementById('planeCoordSystem');
+            planeCoordSystemSelect.innerHTML = '';
+            planeCoordSystems.forEach(system => {
+                const option = document.createElement('option');
+                option.value = system.id;
+                option.textContent = system.name;
+                planeCoordSystemSelect.appendChild(option);
+            });
+            planeCoordSystemSelect.value = selectedValue || selectDefaultPlaneCoordSystem(latestPos.lat, latestPos.lon);
+        }
 
-            self.last_position = {'lat': self.state['x_est_lat'], 'lon': self.state['x_est_lon']}
-            self.last_time = current_time
+        function togglePlaneCoordSystemSelect() {
+            const planeCoordSystemSelectDiv = document.getElementById('planeCoordSystemSelectDiv');
+            planeCoordSystemSelectDiv.style.display = document.getElementById('coordMode').value === 'plane' ? 'block' : 'none';
+        }
 
-            return {
-                'lat': self.state['x_est_lat'],
-                'lon': self.state['x_est_lon'],
-                'velocity': velocity,
-                'rtk_fix_type': data['rtk_fix_type'],
-                'error_radius': data['error_radius'],
-                'satellite_count': data['satellite_count'],
-                'timestamp': current_time.isoformat()
+        function updateDisplay() {
+            const mode = document.getElementById('coordMode').value;
+            const lat = latestPos.lat;
+            const lon = latestPos.lon;
+            let displayText = '';
+
+            try {
+                if (mode === 'latlon') {
+                    displayText = `${i18next.t('latitude_longitude').split('/')[0]}: ${lat.toFixed(6)}<br>${i18next.t('latitude_longitude').split('/')[1]}: ${lon.toFixed(6)}`;
+                } else if (mode === 'mgrs') {
+                    const mgrsStr = mgrs.forward([lon, lat]);
+                    displayText = `MGRS: ${mgrsStr}`;
+                } else if (mode === 'utm') {
+                    const zone = Math.floor((lon + 180) / 6) + 1;
+                    const utmCoords = proj4('WGS84', `+proj=utm +zone=${zone} +datum=WGS84 +units=m +no_defs`, [lon, lat]);
+                    displayText = `UTM Zone ${zone}<br>X: ${utmCoords[0].toFixed(2)} m<br>Y: ${utmCoords[1].toFixed(2)} m`;
+                } else if (mode === 'plane') {
+                    const selectedSystemId = document.getElementById('planeCoordSystem').value;
+                    const selectedSystem = planeCoordSystems.find(s => s.id === selectedSystemId);
+                    if (selectedSystem) {
+                        const planeCoords = proj4('WGS84', selectedSystem.proj4def, [lon, lat]);
+                        displayText = `${i18next.t('y_coord')} (${i18next.t('east_direction')}): ${planeCoords[0].toFixed(2)} m<br>${i18next.t('x_coord')} (${i18next.t('north_direction')}): ${planeCoords[1].toFixed(2)} m`;
+                    } else {
+                        displayText = i18next.t('error_coord_conversion') + ': ' + i18next.t('plane_coord_system_label') + 'が見つかりません';
+                    }
+                }
+            } catch (e) {
+                displayText = i18next.t('error_coord_conversion');
+                console.error(e);
             }
-        except Exception as e:
-            logger.error(f"SensorManager get_data error: {e}")
-            raise
+
+            document.getElementById('coordinateDisplay').innerHTML = displayText;
+        }
+
+        function updateStatus(data) {
+            const t = (key, fallback) => i18next.t(key) || fallback;
+            const velocity = Number.isFinite(data.velocity) ? data.velocity.toFixed(2) : 'N/A';
+            const rtkStatus = data.rtk_fix_type === 4 ? t('rtk_fixed', 'RTK Fixed') : (data.rtk_fix_type === 1 ? t('rtk_float', 'RTK Float') : t('rtk_none', 'No RTK'));
+            const status = `
+                <strong>${t('latitude', 'Latitude')}:</strong> ${data.lat.toFixed(6)}<br>
+                <strong>${t('longitude', 'Longitude')}:</strong> ${data.lon.toFixed(6)}<br>
+                <strong>${t('heading', 'Heading')}:</strong> ${Number.isFinite(data.heading) ? data.heading.toFixed(1) : 'N/A'}°<br>
+                <strong>${t('velocity', 'Velocity')}:</strong> ${velocity} m/s<br>
+                <strong>${t('rtk_status', 'RTK Status')}:</strong> ${rtkStatus}<br>
+                <strong>${t('error_radius', 'Error Radius')}:</strong> ${Number.isFinite(data.error_radius) ? data.error_radius.toFixed(2) : 'N/A'} m<br>
+                <strong>${t('satellite_count', 'Satellites')}:</strong> ${Number.isFinite(data.satellite_count) ? data.satellite_count : 'N/A'}<br>
+                <strong>${t('timestamp', 'Timestamp')}:</strong> ${data.timestamp || 'N/A'}
+            `;
+            document.getElementById('status').innerHTML = status;
+        }
+
+        class MapController {
+            constructor(mapElementId, maxPoints = 1000) {
+                this.map = L.map(mapElementId).setView([35.681236, 139.767125], 15);
+                this.pathPoints = [];
+                this.maxPoints = maxPoints;
+                this.marker = null;
+                this.polyline = L.polyline([], { color: 'blue' }).addTo(this.map);
+                this.followMode = true;
+                this._initTileLayer();
+                this._initEventListeners();
+            }
+
+            _initTileLayer() {
+                const tileLayer = L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                    maxZoom: 19,
+                    attribution: '© OpenStreetMap contributors'
+                }).addTo(this.map);
+                tileLayer.on('tileerror', (error, tile) => {
+                    console.error('Tile loading error:', error, tile);
+                });
+            }
+
+            _initEventListeners() {
+                this.map.on('movestart', () => {
+                    this.followMode = false;
+                });
+            }
+
+            toggleFollowMode() {
+                this.followMode = !this.followMode;
+            }
+
+            updatePosition(lat, lon, headingDeg) {
+                const newLatLng = [lat, lon];
+                this.pathPoints.push(newLatLng);
+                if (this.pathPoints.length > this.maxPoints) {
+                    this.pathPoints.shift();
+                }
+
+                if (this.marker) {
+                    this.marker.setLatLng(newLatLng);
+                    this.marker.setRotationAngle(headingDeg);
+                } else {
+                    this.marker = L.marker(newLatLng, {
+                        icon: this._createHeadingIcon(),
+                        rotationAngle: headingDeg,
+                        rotationOrigin: 'center'
+                    }).addTo(this.map);
+                }
+
+                this.polyline.setLatLngs(this.pathPoints);
+                if (this.followMode) {
+                    this.map.setView(newLatLng);
+                }
+            }
+
+            _createHeadingIcon() {
+                return L.divIcon({
+                    html: '<svg width="20" height="20"><polygon points="10,0 20,20 0,20" style="fill:blue;stroke:black;stroke-width:1"/></svg>',
+                    iconSize: [20, 20],
+                    className: 'heading-icon',
+                    iconAnchor: [10, 10],
+                    tooltipAnchor: [0, -10]
+                });
+            }
+        }
+
+        // Chart.js 初期化
+        const ctx = document.getElementById('errorChart')?.getContext('2d');
+        if (!ctx) {
+            console.error('Canvas element "errorChart" not found');
+            document.getElementById('status').innerHTML = i18next.t('chart_error', 'Chart Initialization Failed');
+            throw new Error('Canvas element not found');
+        }
+
+        const maxDataPoints = 60;
+        let lastUpdate = 0;
+        const minUpdateInterval = 500;
+
+        const chartData = {
+            labels: [],
+            datasets: [
+                {
+                    label: i18next.t('error_radius', 'Error Radius (m)'),
+                    borderColor: 'rgba(255, 99, 132, 1)',
+                    backgroundColor: 'rgba(255, 99, 132, 0.2)',
+                    data: [],
+                    tension: 0.3,
+                    fill: true
+                },
+                {
+                    label: i18next.t('rtk_fix_type', 'RTK Fix Type'),
+                    borderColor: 'rgba(54, 162, 235, 1)',
+                    backgroundColor: 'rgba(54, 162, 235, 0.2)',
+                    data: [],
+                    yAxisID: 'yFix',
+                    tension: 0.3,
+                    fill: true,
+                    stepped: true
+                },
+                {
+                    label: i18next.t('satellite_count', 'Satellite Count'),
+                    borderColor: 'rgba(75, 192, 192, 1)',
+                    backgroundColor: 'rgba(75, 192, 192, 0.2)',
+                    data: [],
+                    ],
+                    yAxisID: 'ySat',
+                    tension: 0.3,
+                    fill: true,
+                    stepped: true
+                }
+            ]
+        };
+
+        const errorChart = new Chart(ctx, {
+            type: 'line',
+            data: chartData,
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                animation: false,
+                scales: {
+                    y: {
+                        type: 'linear',
+                        position: 'left',
+                        title: { display: true, text: i18next.t('error_radius', 'Error Radius (m)') },
+                        min: 0,
+                        suggestedMax: 5,
+                        ticks: { callback: (value) => value.toFixed(1) }
+                    },
+                    yFix: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: i18next.t('rtk_fix_type', 'RTK Fix Type') },
+                        ticks: {
+                            callback: (value) => value === 4 ? i18next.t('rtk_fixed', 'FIX') : (value === 1 ? i18next.t('rtk_float', 'FLOAT') : i18next.t('rtk_none', 'NONE')),
+                            stepSize: 1,
+                            max: 4,
+                            min: 0
+                        },
+                        grid: { drawOnChartArea: false }
+                    },
+                    ySat: {
+                        type: 'linear',
+                        position: 'right',
+                        title: { display: true, text: i18next.t('satellite_count', 'Satellite Count') },
+                        min: 0,
+                        max: 20,
+                        ticks: { stepSize: 2 },
+                        grid: { drawOnChartArea: false }
+                    },
+                    x: {
+                        title: { display: true, text: i18next.t('time', 'Time (s)') }
+                    }
+                },
+                plugins: {
+                    legend: { position: 'top' }
+                }
+            }
+        });
+
+        const mapController = new MapController('map');
+        let latestPos = { lat: 35.681236, lon: 139.767125 };
+        const socket = io();
+
+        socket.on('connect_error', (error) => {
+            console.error('WebSocket connection error:', error);
+            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + error.message;
+        });
+
+        socket.on('error', (data) => {
+            console.error('Server error:', data.message);
+            document.getElementById('status').innerHTML = i18next.t('server_error', 'Server Error: ') + data.message;
+        });
+
+        socket.on('sensor_data', (data) => {
+            if (
+                data &&
+                Number.isFinite(data.lat) && data.lat >= -90 && data.lat <= 90 &&
+                Number.isFinite(data.lon) && data.lon >= -180 && data.lon <= 180
+            ) {
+                latestPos.lat = data.lat;
+                latestPos.lon = data.lon;
+                mapController.updatePosition(data.lat, data.lon, Number.isFinite(data.heading) ? data.heading : 0);
+                updateDisplay();
+                updateStatus(data);
+
+                // グラフ更新
+                const now = performance.now();
+                if (now - lastUpdate < minUpdateInterval) return;
+                lastUpdate = now;
+
+                requestAnimationFrame(() => {
+                    const errorRadius = Number.isFinite(data.error_radius) && data.error_radius >= 0 ? data.error_radius : 0;
+                    const rtkFixType = Number.isFinite(data.rtk_fix_type) && [0, 1, 4].includes(data.rtk_fix_type) ? data.rtk_fix_type : 0;
+                    const satelliteCount = Number.isFinite(data.satellite_count) && data.satellite_count >= 0 ? data.satellite_count : 0;
+                    const timestamp = data.timestamp || new Date().toISOString();
+
+                    chartData.labels.push(new Date(timestamp).toLocaleTimeString('en-US', { hour12: false, hour: '2-digit', minute: '2-digit', second: '2-digit', fractionalSecondDigits: 3 }));
+                    chartData.datasets[0].data.push(errorRadius);
+                    chartData.datasets[1].data.push(rtkFixType);
+                    chartData.datasets[2].data.push(satelliteCount);
+
+                    if (chartData.labels.length > maxDataPoints) {
+                        chartData.labels.shift();
+                        chartData.datasets.forEach(ds => ds.data.shift());
+                    }
+
+                    errorChart.update();
+                });
+            } else {
+                console.error('Invalid position data:', data);
+            }
+        });
+    </script>
+</body>
+</html>
