@@ -5,6 +5,8 @@ import time
 from datetime import datetime, timezone
 from threading import Lock
 from typing import Dict
+from sensor_module import SensorManager, IMUReader 
+
 
 logging.basicConfig(level=logging.INFO, filename='app.log', format='%(asctime)s %(levelname)s: %(message)s')
 logger = logging.getLogger(__name__)
@@ -44,6 +46,8 @@ def emit_sensor_data():
             socketio.emit('error', {'message': str(e)})
             time.sleep(1)
 
+
 if __name__ == '__main__':
     socketio.start_background_task(emit_sensor_data)
-    socketio.run(app, host='0.0.0.0, port=5000, debug=False)
+    socketio.run(app, host='0.0.0.0', port=5000, debug=False)
+
